@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# uv
+uv.lock
+
+# Project docs (internal planning only)
+claude.md
+spec.md

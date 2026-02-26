@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prism-lm"
+version = "0.1.0"
+description = "PRobabilistic Inference for Structured Measurement — extract full probability distributions from local LLMs over discrete label sets"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Joseph Stover" },
+]
+dependencies = [
+    "polars",
+    "pandas",
+]
+
+[project.optional-dependencies]
+mlx = [
+    "mlx",
+    "mlx-lm",
+]
+torch = [
+    "torch",
+    "transformers",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prism"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
