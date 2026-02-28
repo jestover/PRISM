@@ -106,11 +106,13 @@ def classify(
 
     Returns:
         Input DataFrame with added columns: ``prob_{label}`` for each label,
-        ``predicted_class``, ``max_prob``, and ``entropy``.
+        ``predicted_class``, ``max_prob``, ``entropy``, and ``thinking_text``
+        (when ``use_reasoning=True``).
     """
     texts = _get_column(df, column_name)
     n = len(texts)
-    logger.info(f"classify: {n} texts, {len(labels)} labels, use_reasoning={use_reasoning}")
+    reasoning_active = use_reasoning and model.can_reason
+    logger.info(f"classify: {n} texts, {len(labels)} labels, use_reasoning={reasoning_active}")
 
     builder = PromptBuilder(random_seed=random_seed)
     label_token_sequences = model.tokenize_labels(labels)
@@ -120,6 +122,7 @@ def classify(
 
     contexts = _resolve_contexts(context, n)
     all_probs: List[Dict[str, float]] = []
+    all_thinking: List[Optional[str]] = []
 
     for i, text in enumerate(texts):
         system_msg, user_msg = builder.render_classify(
@@ -132,17 +135,16 @@ def classify(
         )
         prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
 
-        if use_reasoning and model.can_reason:
+        if reasoning_active:
             result = computer.compute_probabilities_with_cot(
                 prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
             )
-            probs = result.probabilities
+            all_probs.append(result.probabilities)
+            all_thinking.append(result.thinking_text)
         else:
-            # Append reasoning prefix to skip thinking phase on reasoning models
             direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
-            probs = computer.compute_probabilities(direct_tokens)
-
-        all_probs.append(probs)
+            all_probs.append(computer.compute_probabilities(direct_tokens))
+            all_thinking.append(None)
 
         if (i + 1) % 100 == 0 or i == n - 1:
             logger.info(f"classify: processed {i + 1}/{n}")
@@ -155,6 +157,8 @@ def classify(
     columns["predicted_class"] = [max(p, key=p.get) for p in all_probs]
     columns["max_prob"] = [max(p.values()) for p in all_probs]
     columns["entropy"] = [_entropy(p) for p in all_probs]
+    if reasoning_active:
+        columns["thinking_text"] = all_thinking
 
     return _add_columns(df, columns)
 
@@ -199,10 +203,12 @@ def rate(
 
     Returns:
         Input DataFrame with added columns: ``prob_{i}`` for each integer,
-        ``expected_value``, ``std_dev``, ``mode``, and ``entropy``.
+        ``expected_value``, ``std_dev``, ``mode``, ``entropy``, and
+        ``thinking_text`` (when ``use_reasoning=True``).
     """
     texts = _get_column(df, column_name)
     n = len(texts)
+    reasoning_active = use_reasoning and model.can_reason
     scale_labels = [str(i) for i in range(scale_min, scale_max + 1)]
     logger.info(f"rate: {n} texts, attribute={attribute!r}, scale={scale_min}-{scale_max}")
 
@@ -214,6 +220,7 @@ def rate(
 
     contexts = _resolve_contexts(context, n)
     all_probs: List[Dict[str, float]] = []
+    all_thinking: List[Optional[str]] = []
 
     for i, text in enumerate(texts):
         system_msg, user_msg = builder.render_rate(
@@ -227,16 +234,16 @@ def rate(
         )
         prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
 
-        if use_reasoning and model.can_reason:
+        if reasoning_active:
             result = computer.compute_probabilities_with_cot(
                 prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
             )
-            probs = result.probabilities
+            all_probs.append(result.probabilities)
+            all_thinking.append(result.thinking_text)
         else:
             direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
-            probs = computer.compute_probabilities(direct_tokens)
-
-        all_probs.append(probs)
+            all_probs.append(computer.compute_probabilities(direct_tokens))
+            all_thinking.append(None)
 
         if (i + 1) % 100 == 0 or i == n - 1:
             logger.info(f"rate: processed {i + 1}/{n}")
@@ -264,6 +271,8 @@ def rate(
     columns["std_dev"] = std_devs
     columns["mode"] = modes
     columns["entropy"] = [_entropy(p) for p in all_probs]
+    if reasoning_active:
+        columns["thinking_text"] = all_thinking
 
     return _add_columns(df, columns)
 
@@ -302,11 +311,13 @@ def binary_classify(
         save_dir: Not yet implemented.
 
     Returns:
-        Input DataFrame with added columns: ``prob_true_{label}`` and
-        ``predicted_{label}`` (bool) for each label.
+        Input DataFrame with added columns: ``prob_true_{label}``,
+        ``predicted_{label}`` (bool), and ``thinking_text_{label}``
+        (when ``use_reasoning=True``) for each label.
     """
     texts = _get_column(df, column_name)
     n = len(texts)
+    reasoning_active = use_reasoning and model.can_reason
     logger.info(f"binary_classify: {n} texts, {len(labels)} labels")
 
     builder = PromptBuilder(random_seed=random_seed)
@@ -321,6 +332,7 @@ def binary_classify(
 
     for label_name, label_description in labels.items():
         prob_trues: List[float] = []
+        thinking_texts: List[Optional[str]] = []
         logger.info(f"binary_classify: starting label {label_name!r}")
 
         for i, text in enumerate(texts):
@@ -333,22 +345,25 @@ def binary_classify(
             )
             prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
 
-            if use_reasoning and model.can_reason:
+            if reasoning_active:
                 result = computer.compute_probabilities_with_cot(
                     prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
                 )
-                probs = result.probabilities
+                prob_trues.append(result.probabilities["true"])
+                thinking_texts.append(result.thinking_text)
             else:
                 direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
                 probs = computer.compute_probabilities(direct_tokens)
-
-            prob_trues.append(probs["true"])
+                prob_trues.append(probs["true"])
+                thinking_texts.append(None)
 
             if (i + 1) % 100 == 0 or i == n - 1:
                 logger.info(f"binary_classify [{label_name}]: processed {i + 1}/{n}")
 
         columns[f"prob_true_{label_name}"] = prob_trues
         columns[f"predicted_{label_name}"] = [p > 0.5 for p in prob_trues]
+        if reasoning_active:
+            columns[f"thinking_text_{label_name}"] = thinking_texts
 
     return _add_columns(df, columns)
 

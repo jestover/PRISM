@@ -12,7 +12,7 @@ PRISM is a Python package for extracting full probability distributions from loc
 
 ## Relationship to GABRIEL
 
-[GABRIEL](https://github.com/openai/GABRIEL) (Asirvatham, Mokski, & Shleifer 2026, "GPT as a Measurement Tool") is a landmark Python library that makes LLMs practical as a measurement tool for social science research. GABRIEL wraps the OpenAI API to classify and rate qualitative data at scale, demonstrating that LLM-generated labels match human labels in reliability across hundreds of datasets. It is, in effect, Stata for LLM-based text measurement.
+[GABRIEL](https://github.com/openai/GABRIEL) is a Python library that wraps the OpenAI API and provides a clean, practical interface for researchers to classify and rate qualitative data at scale — in effect, Stata for LLM-based text measurement. Asirvatham, Mokski, & Shleifer introduced GABRIEL in their paper *GPT as a Measuremnt Tool*, which demonstrates that LLM-generated labels match human labels in reliability across hundreds of datasets.
 
 PRISM builds on GABRIEL's contributions and is designed to complement it. Where GABRIEL calls the OpenAI API and returns a point estimate (a single label or rating), PRISM runs models locally and returns the full probability distribution over all possible labels. This reveals the model's uncertainty — two texts rated "50" might have very different distributions, one sharply peaked and the other bimodal — which is invisible in point estimates. The point estimate can always be recovered (it's just the mode or expected value), but the reverse is impossible.
 
@@ -26,6 +26,7 @@ We aim to keep PRISM's API consistent with GABRIEL's so that researchers can mov
 - Are working on tasks where a point estimate is sufficient
 - Don't need uncertainty quantification
 - Want the simplest possible setup
+- Want results that don't come from a finite set of labels
 
 **PRISM is the better choice when you:**
 - Need the full probability distribution, not just a point estimate
@@ -38,18 +39,20 @@ We aim to keep PRISM's API consistent with GABRIEL's so that researchers can mov
 
 ## Installation
 
+PRISM is not yet on PyPI. Install directly from GitHub:
+
 ```bash
-pip install prism-lm
+pip install "prism-lm @ git+https://github.com/jestover/PRISM.git"
 ```
 
 Install the backend for your hardware:
 
 ```bash
 # Apple Silicon (MLX)
-pip install "prism-lm[mlx]"
+pip install "prism-lm[mlx] @ git+https://github.com/jestover/PRISM.git"
 
 # CUDA / CPU (PyTorch)
-pip install "prism-lm[torch]"
+pip install "prism-lm[torch] @ git+https://github.com/jestover/PRISM.git"
 ```
 
 ## Quick Start
@@ -126,9 +129,7 @@ Returns columns: `prob_true_toxic`, `predicted_toxic`, `prob_true_sarcastic`, `p
 
 ## How It Works
 
-PRISM works by examining the raw logits (pre-softmax scores) that an LLM produces at the token position where it would generate a label. Rather than letting the model sample a single token, PRISM reads the probability the model assigns to each possible label token and computes a normalized distribution.
-
-For labels that span multiple tokens, PRISM builds a trie of token sequences and identifies branch points where sequences diverge, evaluating logits only where needed. For example, classifying into three labels that tokenize as `[1,5,9]`, `[1,5,10]`, and `[2,6,8]` requires only 2 logit evaluations instead of 3, because the first two labels share a prefix.
+PRISM works by examining the raw logits (pre-softmax scores) that an LLM produces at the token position where it would generate a label. Rather than letting the model sample a single token, PRISM computes the probabilities the model assigns to each possible label token and returns .
 
 ### Chain of Thought
 
@@ -149,7 +150,7 @@ result = prism.classify(
 )
 ```
 
-The model generates thinking tokens freely, and once it signals that it's ready to answer, PRISM extracts the probability distribution from that position.
+The model generates thinking tokens freely, and once it signals that it's ready to answer, PRISM extracts the probability distribution from that position. Please note that this will often compress the probability distribution since the model often decides on a label in the thinking phase. When `use_reasoning=True`, PRISM adds a `thinking_text` column to the output DataFrame containing the model's reasoning for each row.
 
 ## License
 
@@ -157,6 +158,14 @@ MIT. See [LICENSE](LICENSE).
 
 ## Citation
 
-If you use PRISM in academic work, please also cite GABRIEL, which established the paradigm of using LLMs as measurement tools for social science:
+A paper describing PRISM's measurement technique is in preparation.
 
-> Asirvatham, Mokski, & Shleifer (2026). "GPT as a Measurement Tool." Available at: https://github.com/openai/GABRIEL
+If you use PRISM in academic work, for now please cite
+
+- Stover, J. (2026). *PRISM: PRobabilistic Inference for Structured Measurement* (software). GitHub repository: https://github.com/jestover/PRISM
+
+This project and its structure owes a lot to the work on GABRIEL, you might also consider citing:
+
+- Asirvatham, H., Mokski, E., and Shleifer, A. (2026). *GPT as a Measurement Tool*. NBER Working Paper No. 34834.
+
+- Asirvatham, H. and Mokski, E. (2026). *GABRIEL: Generalized Attribute-Based Ratings Information Extraction Library* (software). GitHub repository: https://github.com/openai/GABRIEL
