@@ -65,6 +65,7 @@ import prism
 model = prism.load_model(
     "mlx-community/gpt-oss-20b-MXFP4-Q8",
     backend="mlx",       # "mlx", "torch", or "auto"
+    reasoning_prefix="<|channel|>final<|message|>",
 )
 ```
 
