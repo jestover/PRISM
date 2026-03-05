@@ -137,7 +137,7 @@ def classify(
 
         if reasoning_active:
             result = computer.compute_probabilities_with_cot(
-                prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
+                prompt_tokens, model.think_end_tokens, max_thinking_tokens
             )
             all_probs.append(result.probabilities)
             all_thinking.append(result.thinking_text)
@@ -236,7 +236,7 @@ def rate(
 
         if reasoning_active:
             result = computer.compute_probabilities_with_cot(
-                prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
+                prompt_tokens, model.think_end_tokens, max_thinking_tokens
             )
             all_probs.append(result.probabilities)
             all_thinking.append(result.thinking_text)
@@ -347,7 +347,7 @@ def binary_classify(
 
             if reasoning_active:
                 result = computer.compute_probabilities_with_cot(
-                    prompt_tokens, model.reasoning_prefix_tokens, max_thinking_tokens
+                    prompt_tokens, model.think_end_tokens, max_thinking_tokens
                 )
                 prob_trues.append(result.probabilities["true"])
                 thinking_texts.append(result.thinking_text)
@@ -374,17 +374,17 @@ def binary_classify(
 
 
 def _direct_prompt_tokens(prompt_tokens: List[int], model: Model) -> List[int]:
-    """Append reasoning prefix to skip thinking phase on reasoning models.
+    """Append think-end tokens to skip thinking phase on reasoning models.
 
     For models that support chain-of-thought, the generation prompt
     (e.g. ``<|start|>assistant``) puts the model into thinking mode.
-    Appending the reasoning prefix (e.g. ``<|channel|>final<|message|>``)
+    Appending the think-end sequence (e.g. ``<|channel|>final<|message|>``)
     tells the model to skip thinking and answer directly.
 
-    For models without a reasoning prefix, returns prompt_tokens unchanged.
+    For models without a think-end sequence, returns prompt_tokens unchanged.
     """
-    if model.reasoning_prefix_tokens:
-        return prompt_tokens + model.reasoning_prefix_tokens
+    if model.think_end_tokens:
+        return prompt_tokens + model.think_end_tokens
     return prompt_tokens
 
 

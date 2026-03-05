@@ -81,7 +81,7 @@ class LabelProbabilityComputer:
         """Compute probabilities after allowing chain-of-thought reasoning.
 
         The model generates tokens freely until it produces the stop sequence
-        (typically the reasoning prefix), then label probabilities are computed
+        (the think-end sequence), then label probabilities are computed
         from the post-thinking position.
 
         Args:

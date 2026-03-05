@@ -65,11 +65,10 @@ import prism
 model = prism.load_model(
     "mlx-community/gpt-oss-20b-MXFP4-Q8",
     backend="mlx",       # "mlx", "torch", or "auto"
-    reasoning_prefix="<|channel|>final<|message|>",
 )
 ```
 
-Any HuggingFace-compatible model works — no hardcoded model configs.
+Any HuggingFace-compatible model works — no hardcoded model configs. PRISM auto-detects reasoning models (QwQ, DeepSeek-R1, Qwen3, gpt-oss, etc.) from their chat template and configures the think-end sequence automatically. You can override with `think_end="</think>"` if needed.
 
 ### Classify
 
@@ -140,7 +139,6 @@ For models that support reasoning, PRISM can let the model think before extracti
 model = prism.load_model(
     "mlx-community/gpt-oss-20b-MXFP4-Q8",
     backend="mlx",
-    reasoning_prefix="<|channel|>final<|message|>",  # marks end of thinking
 )
 
 result = prism.classify(
@@ -151,7 +149,7 @@ result = prism.classify(
 )
 ```
 
-The model generates thinking tokens freely, and once it signals that it's ready to answer, PRISM extracts the probability distribution from that position. Please note that this will often compress the probability distribution since the model often decides on a label in the thinking phase. When `use_reasoning=True`, PRISM adds a `thinking_text` column to the output DataFrame containing the model's reasoning for each row.
+PRISM auto-detects the think-end sequence from the model's chat template (e.g. `</think>` for QwQ/Qwen3, `<|channel|>final<|message|>` for gpt-oss). The model generates thinking tokens freely, and once it produces the think-end sequence, PRISM extracts the probability distribution from that position. Please note that this will often compress the probability distribution since the model often decides on a label in the thinking phase. When `use_reasoning=True`, PRISM adds a `thinking_text` column to the output DataFrame containing the model's reasoning for each row.
 
 ## License
 
