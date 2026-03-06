@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from prism.core.token_trie import LabelTokenTrie
 from prism.utils import get_logger
@@ -67,6 +67,85 @@ class LabelProbabilityComputer:
 
             for token_id, prob in zip(valid_tokens, probs_list):
                 for label in branch_point.branches[token_id]:
+                    label_probs[label] *= prob
+
+        return label_probs
+
+    def compute_probabilities_cached(
+        self,
+        prompt_logits: Any,
+        prompt_cache: Any,
+    ) -> Dict[str, float]:
+        """Compute P(label) using cached prompt state (Level 3).
+
+        Instead of reprocessing the full prompt for each branch point
+        (as :meth:`compute_probabilities` does), this method:
+
+        1. Uses *prompt_logits* for the root branch point (prefix=[]).
+        2. For deeper branch points, forks the nearest cached ancestor
+           and forwards only the incremental prefix tokens.
+
+        This is Level 3 of the cascading cache hierarchy.  The caller
+        obtains ``prompt_logits`` and ``prompt_cache`` from
+        :meth:`~prism.core.prompt_cache.CascadingCache.forward_row`.
+
+        Args:
+            prompt_logits: Logits at the final prompt position.
+            prompt_cache: KV cache containing the full prompt's state.
+
+        Returns:
+            Mapping of ``{label: probability}``.
+        """
+        label_probs: Dict[str, float] = {
+            label: 1.0 for label in self.trie.label_sequences
+        }
+
+        # Sort branch points by prefix length for correct tree traversal
+        sorted_bps = sorted(
+            self.trie.branch_points, key=lambda bp: len(bp.prefix)
+        )
+
+        # Cache state at each resolved prefix for parent look-up.
+        # key: tuple(prefix), value: (logits, cache)
+        prefix_states: Dict[Tuple[int, ...], Tuple[Any, Any]] = {
+            (): (prompt_logits, prompt_cache)
+        }
+
+        for bp in sorted_bps:
+            prefix_key = tuple(bp.prefix)
+
+            if not bp.prefix:
+                # Root branch point — use prompt state directly
+                logits = prompt_logits
+            else:
+                # Find the longest cached ancestor prefix
+                parent_key: Tuple[int, ...] = ()
+                for length in range(len(prefix_key) - 1, -1, -1):
+                    candidate = prefix_key[:length]
+                    if candidate in prefix_states:
+                        parent_key = candidate
+                        break
+
+                parent_logits, parent_cache = prefix_states[parent_key]
+                incremental = list(prefix_key[len(parent_key) :])
+
+                if incremental:
+                    child_cache = self.backend.copy_cache(parent_cache)
+                    logits, child_cache = self.backend.forward(
+                        incremental, child_cache
+                    )
+                    prefix_states[prefix_key] = (logits, child_cache)
+                else:
+                    logits = parent_logits
+
+            # Extract probabilities at this branch point
+            valid_tokens = list(bp.branches.keys())
+            masked_logits = logits[valid_tokens]
+            probs = self.backend.softmax(masked_logits)
+            probs_list = probs.tolist()
+
+            for token_id, prob in zip(valid_tokens, probs_list):
+                for label in bp.branches[token_id]:
                     label_probs[label] *= prob
 
         return label_probs

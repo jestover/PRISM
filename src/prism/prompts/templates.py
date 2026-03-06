@@ -191,6 +191,108 @@ class PromptBuilder:
 
         return system, user
 
+    # -- system-only and user-only renderers (for CascadingCache) --
+
+    def render_classify_system(
+        self,
+        ordering: Tuple[str, ...],
+        label_descriptions: Optional[Dict[str, str]] = None,
+        additional_instructions: Optional[str] = None,
+    ) -> str:
+        """Render only the system message for a classify prompt.
+
+        Args:
+            ordering: Label ordering (tuple of label strings).
+            label_descriptions: Optional descriptions for each label.
+            additional_instructions: Extra instructions.
+
+        Returns:
+            System message string.
+        """
+        label_descriptions_block = self._label_descriptions_block(
+            list(ordering), label_descriptions
+        )
+        additional_instructions_block = self._additional_instructions_block(
+            additional_instructions
+        )
+        return CLASSIFY_SYSTEM.format(
+            label_descriptions_block=label_descriptions_block,
+            additional_instructions_block=additional_instructions_block,
+        )
+
+    @staticmethod
+    def render_classify_user(
+        text: str,
+        context: Optional[str] = None,
+    ) -> str:
+        """Render only the user message for a classify prompt."""
+        context_block = PromptBuilder._context_block(context)
+        return CLASSIFY_USER.format(context_block=context_block, text=text)
+
+    @staticmethod
+    def render_rate_system(
+        attribute: str,
+        attribute_description: Optional[str] = None,
+        scale_min: int = 0,
+        scale_max: int = 100,
+        additional_instructions: Optional[str] = None,
+    ) -> str:
+        """Render only the system message for a rate prompt."""
+        attribute_description_block = (
+            f"Description: {attribute_description}\n\n"
+            if attribute_description
+            else "\n"
+        )
+        additional_instructions_block = PromptBuilder._additional_instructions_block(
+            additional_instructions
+        )
+        return RATE_SYSTEM.format(
+            attribute=attribute,
+            attribute_description_block=attribute_description_block,
+            scale_min=scale_min,
+            scale_max=scale_max,
+            additional_instructions_block=additional_instructions_block,
+        )
+
+    @staticmethod
+    def render_rate_user(
+        text: str,
+        context: Optional[str] = None,
+    ) -> str:
+        """Render only the user message for a rate prompt."""
+        context_block = PromptBuilder._context_block(context)
+        return RATE_USER.format(context_block=context_block, text=text)
+
+    @staticmethod
+    def render_binary_classify_system(
+        label: str,
+        label_description: Optional[str] = None,
+        additional_instructions: Optional[str] = None,
+    ) -> str:
+        """Render only the system message for a binary classify prompt."""
+        label_description_block = (
+            f"Description: {label_description}\n\n"
+            if label_description
+            else "\n"
+        )
+        additional_instructions_block = PromptBuilder._additional_instructions_block(
+            additional_instructions
+        )
+        return BINARY_CLASSIFY_SYSTEM.format(
+            label=label,
+            label_description_block=label_description_block,
+            additional_instructions_block=additional_instructions_block,
+        )
+
+    @staticmethod
+    def render_binary_classify_user(
+        text: str,
+        context: Optional[str] = None,
+    ) -> str:
+        """Render only the user message for a binary classify prompt."""
+        context_block = PromptBuilder._context_block(context)
+        return BINARY_CLASSIFY_USER.format(context_block=context_block, text=text)
+
     # -- helpers --
 
     @staticmethod

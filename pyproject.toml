@@ -25,6 +25,7 @@ mlx = [
 torch = [
     "torch",
     "transformers",
+    "accelerate",
 ]
 dev = [
     "pytest",

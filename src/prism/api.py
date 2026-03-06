@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from prism.core.label_probs import LabelProbabilityComputer
+from prism.core.prompt_cache import CascadingCache
 from prism.model import Model
 from prism.prompts.templates import PromptBuilder
 from prism.utils import get_logger
@@ -121,42 +122,105 @@ def classify(
     )
 
     contexts = _resolve_contexts(context, n)
-    all_probs: List[Dict[str, float]] = []
-    all_thinking: List[Optional[str]] = []
+    all_probs: List[Optional[Dict[str, float]]] = [None] * n
+    all_thinking: List[Optional[str]] = [None] * n
 
-    for i, text in enumerate(texts):
-        system_msg, user_msg = builder.render_classify(
-            text=text,
-            labels=labels,
-            label_descriptions=label_descriptions,
-            context=contexts[i],
-            additional_instructions=additional_instructions,
-            shuffle=shuffle_labels,
-        )
-        prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
-
-        if reasoning_active:
+    if reasoning_active:
+        # --- COT path: uncached (generate_until handles its own cache) ---
+        for i, text in enumerate(texts):
+            system_msg, user_msg = builder.render_classify(
+                text=text,
+                labels=labels,
+                label_descriptions=label_descriptions,
+                context=contexts[i],
+                additional_instructions=additional_instructions,
+                shuffle=shuffle_labels,
+            )
+            prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
             result = computer.compute_probabilities_with_cot(
                 prompt_tokens, model.think_end_tokens, max_thinking_tokens
             )
-            all_probs.append(result.probabilities)
-            all_thinking.append(result.thinking_text)
-        else:
-            direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
-            all_probs.append(computer.compute_probabilities(direct_tokens))
-            all_thinking.append(None)
+            all_probs[i] = result.probabilities
+            all_thinking[i] = result.thinking_text
 
-        if (i + 1) % 100 == 0 or i == n - 1:
-            logger.info(f"classify: processed {i + 1}/{n}")
+            if (i + 1) % 100 == 0 or i == n - 1:
+                logger.info(f"classify: processed {i + 1}/{n}")
+    else:
+        # --- Non-COT path: CascadingCache with label ordering batching ---
+
+        # Pre-generate orderings (same RNG sequence = reproducible)
+        orderings: List[Tuple[str, ...]] = []
+        for _ in range(n):
+            ordered = list(labels)
+            if shuffle_labels:
+                builder.rng.shuffle(ordered)
+            orderings.append(tuple(ordered))
+
+        # Group rows by ordering
+        groups: Dict[Tuple[str, ...], List[int]] = {}
+        for i, ordering in enumerate(orderings):
+            if ordering not in groups:
+                groups[ordering] = []
+            groups[ordering].append(i)
+
+        logger.info(f"classify: {len(groups)} ordering groups for {n} rows")
+
+        # Determine if context is constant
+        ctx_is_constant = _is_context_constant(contexts)
+        constant_ctx = _get_constant_context(contexts) if ctx_is_constant else None
+
+        # Build render functions for CascadingCache
+        def render_sys(ordering: Tuple[str, ...]) -> str:
+            return builder.render_classify_system(
+                ordering,
+                label_descriptions=label_descriptions,
+                additional_instructions=additional_instructions,
+            )
+
+        render_usr = PromptBuilder.render_classify_user
+
+        # Build CascadingCache (Level 0)
+        cascading = CascadingCache(
+            backend=model.backend,
+            model=model,
+            render_system_fn=render_sys,
+            render_user_fn=render_usr,
+            labels=labels,
+            context_is_constant=ctx_is_constant,
+            build_level0=shuffle_labels,
+        )
+
+        processed = 0
+        for ordering, row_indices in groups.items():
+            # Level 1: cache ordering-specific prefix
+            cascading.set_ordering(ordering, constant_context=constant_ctx)
+
+            for i in row_indices:
+                sys_msg = render_sys(ordering)
+                usr_msg = render_usr(texts[i], context=contexts[i])
+                prompt_tokens = model.tokenize_prompt(sys_msg, usr_msg)
+                direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
+
+                # Level 2: forward row-specific suffix
+                logits, row_cache = cascading.forward_row(direct_tokens)
+
+                # Level 3: compute probabilities at branch points
+                all_probs[i] = computer.compute_probabilities_cached(
+                    logits, row_cache
+                )
+
+                processed += 1
+                if processed % 100 == 0 or processed == n:
+                    logger.info(f"classify: processed {processed}/{n}")
 
     # Build output columns
     columns: Dict[str, list] = {}
     for label in labels:
-        columns[f"prob_{label}"] = [p[label] for p in all_probs]
+        columns[f"prob_{label}"] = [p[label] for p in all_probs]  # type: ignore[index]
 
-    columns["predicted_class"] = [max(p, key=p.get) for p in all_probs]
-    columns["max_prob"] = [max(p.values()) for p in all_probs]
-    columns["entropy"] = [_entropy(p) for p in all_probs]
+    columns["predicted_class"] = [max(p, key=p.get) for p in all_probs]  # type: ignore[arg-type]
+    columns["max_prob"] = [max(p.values()) for p in all_probs]  # type: ignore[union-attr]
+    columns["entropy"] = [_entropy(p) for p in all_probs]  # type: ignore[arg-type]
     if reasoning_active:
         columns["thinking_text"] = all_thinking
 
@@ -219,39 +283,72 @@ def rate(
     )
 
     contexts = _resolve_contexts(context, n)
-    all_probs: List[Dict[str, float]] = []
-    all_thinking: List[Optional[str]] = []
+    all_probs: List[Optional[Dict[str, float]]] = [None] * n
+    all_thinking: List[Optional[str]] = [None] * n
 
-    for i, text in enumerate(texts):
-        system_msg, user_msg = builder.render_rate(
-            text=text,
+    if reasoning_active:
+        # --- COT path: uncached ---
+        for i, text in enumerate(texts):
+            system_msg, user_msg = builder.render_rate(
+                text=text,
+                attribute=attribute,
+                attribute_description=attribute_description,
+                scale_min=scale_min,
+                scale_max=scale_max,
+                context=contexts[i],
+                additional_instructions=additional_instructions,
+            )
+            prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
+            result = computer.compute_probabilities_with_cot(
+                prompt_tokens, model.think_end_tokens, max_thinking_tokens
+            )
+            all_probs[i] = result.probabilities
+            all_thinking[i] = result.thinking_text
+
+            if (i + 1) % 100 == 0 or i == n - 1:
+                logger.info(f"rate: processed {i + 1}/{n}")
+    else:
+        # --- Non-COT path: CascadingCache (fixed prefix, no label shuffling) ---
+        ctx_is_constant = _is_context_constant(contexts)
+        constant_ctx = _get_constant_context(contexts) if ctx_is_constant else None
+
+        system_msg = PromptBuilder.render_rate_system(
             attribute=attribute,
             attribute_description=attribute_description,
             scale_min=scale_min,
             scale_max=scale_max,
-            context=contexts[i],
             additional_instructions=additional_instructions,
         )
-        prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
+        render_usr = PromptBuilder.render_rate_user
 
-        if reasoning_active:
-            result = computer.compute_probabilities_with_cot(
-                prompt_tokens, model.think_end_tokens, max_thinking_tokens
-            )
-            all_probs.append(result.probabilities)
-            all_thinking.append(result.thinking_text)
-        else:
+        cascading = CascadingCache(
+            backend=model.backend,
+            model=model,
+            render_system_fn=lambda _ordering: system_msg,
+            render_user_fn=render_usr,
+            labels=scale_labels,
+            context_is_constant=ctx_is_constant,
+            build_level0=False,
+        )
+        cascading.set_fixed_prefix(system_msg, constant_context=constant_ctx)
+
+        for i, text in enumerate(texts):
+            usr_msg = render_usr(text, context=contexts[i])
+            prompt_tokens = model.tokenize_prompt(system_msg, usr_msg)
             direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
-            all_probs.append(computer.compute_probabilities(direct_tokens))
-            all_thinking.append(None)
 
-        if (i + 1) % 100 == 0 or i == n - 1:
-            logger.info(f"rate: processed {i + 1}/{n}")
+            logits, row_cache = cascading.forward_row(direct_tokens)
+            all_probs[i] = computer.compute_probabilities_cached(
+                logits, row_cache
+            )
+
+            if (i + 1) % 100 == 0 or i == n - 1:
+                logger.info(f"rate: processed {i + 1}/{n}")
 
     # Build output columns
     columns: Dict[str, list] = {}
     for label in scale_labels:
-        columns[f"prob_{label}"] = [p[label] for p in all_probs]
+        columns[f"prob_{label}"] = [p[label] for p in all_probs]  # type: ignore[index]
 
     # Summary statistics
     scale_values = list(range(scale_min, scale_max + 1))
@@ -260,9 +357,9 @@ def rate(
     modes = []
 
     for probs in all_probs:
-        ev = sum(v * probs[str(v)] for v in scale_values)
-        var = sum((v - ev) ** 2 * probs[str(v)] for v in scale_values)
-        mode_val = max(scale_values, key=lambda v: probs[str(v)])
+        ev = sum(v * probs[str(v)] for v in scale_values)  # type: ignore[index]
+        var = sum((v - ev) ** 2 * probs[str(v)] for v in scale_values)  # type: ignore[index]
+        mode_val = max(scale_values, key=lambda v: probs[str(v)])  # type: ignore[index]
         expected_values.append(ev)
         std_devs.append(math.sqrt(var))
         modes.append(mode_val)
@@ -270,7 +367,7 @@ def rate(
     columns["expected_value"] = expected_values
     columns["std_dev"] = std_devs
     columns["mode"] = modes
-    columns["entropy"] = [_entropy(p) for p in all_probs]
+    columns["entropy"] = [_entropy(p) for p in all_probs]  # type: ignore[arg-type]
     if reasoning_active:
         columns["thinking_text"] = all_thinking
 
@@ -335,30 +432,66 @@ def binary_classify(
         thinking_texts: List[Optional[str]] = []
         logger.info(f"binary_classify: starting label {label_name!r}")
 
-        for i, text in enumerate(texts):
-            system_msg, user_msg = builder.render_binary_classify(
-                text=text,
-                label=label_name,
-                label_description=label_description,
-                context=contexts[i],
-                additional_instructions=additional_instructions,
-            )
-            prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
-
-            if reasoning_active:
+        if reasoning_active:
+            # --- COT path: uncached ---
+            for i, text in enumerate(texts):
+                system_msg, user_msg = builder.render_binary_classify(
+                    text=text,
+                    label=label_name,
+                    label_description=label_description,
+                    context=contexts[i],
+                    additional_instructions=additional_instructions,
+                )
+                prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
                 result = computer.compute_probabilities_with_cot(
                     prompt_tokens, model.think_end_tokens, max_thinking_tokens
                 )
                 prob_trues.append(result.probabilities["true"])
                 thinking_texts.append(result.thinking_text)
-            else:
+
+                if (i + 1) % 100 == 0 or i == n - 1:
+                    logger.info(
+                        f"binary_classify [{label_name}]: processed {i + 1}/{n}"
+                    )
+        else:
+            # --- Non-COT path: CascadingCache (one per label) ---
+            ctx_is_constant = _is_context_constant(contexts)
+            constant_ctx = (
+                _get_constant_context(contexts) if ctx_is_constant else None
+            )
+
+            system_msg = PromptBuilder.render_binary_classify_system(
+                label=label_name,
+                label_description=label_description,
+                additional_instructions=additional_instructions,
+            )
+            render_usr = PromptBuilder.render_binary_classify_user
+
+            cascading = CascadingCache(
+                backend=model.backend,
+                model=model,
+                render_system_fn=lambda _ordering: system_msg,
+                render_user_fn=render_usr,
+                labels=binary_labels,
+                context_is_constant=ctx_is_constant,
+                build_level0=False,
+            )
+            cascading.set_fixed_prefix(system_msg, constant_context=constant_ctx)
+
+            for i, text in enumerate(texts):
+                usr_msg = render_usr(text, context=contexts[i])
+                prompt_tokens = model.tokenize_prompt(system_msg, usr_msg)
                 direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
-                probs = computer.compute_probabilities(direct_tokens)
+
+                logits, row_cache = cascading.forward_row(direct_tokens)
+                probs = computer.compute_probabilities_cached(logits, row_cache)
                 prob_trues.append(probs["true"])
                 thinking_texts.append(None)
 
-            if (i + 1) % 100 == 0 or i == n - 1:
-                logger.info(f"binary_classify [{label_name}]: processed {i + 1}/{n}")
+                if (i + 1) % 100 == 0 or i == n - 1:
+                    logger.info(
+                        f"binary_classify [{label_name}]: processed {i + 1}/{n}"
+                    )
 
         columns[f"prob_true_{label_name}"] = prob_trues
         columns[f"predicted_{label_name}"] = [p > 0.5 for p in prob_trues]
@@ -399,3 +532,18 @@ def _resolve_contexts(
     if len(context) != n:
         raise ValueError(f"context list length ({len(context)}) != number of rows ({n})")
     return context
+
+
+def _is_context_constant(contexts: List[Optional[str]]) -> bool:
+    """Check whether all context values are identical."""
+    if not contexts:
+        return True
+    first = contexts[0]
+    return all(c == first for c in contexts)
+
+
+def _get_constant_context(contexts: List[Optional[str]]) -> Optional[str]:
+    """Return the constant context value (may be ``None``)."""
+    if not contexts:
+        return None
+    return contexts[0]

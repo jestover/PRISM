@@ -152,3 +152,4 @@ class MLXBackend(InferenceBackend):
             generated_tokens.append(next_token)
 
         return generated_tokens, current_tokens
+
