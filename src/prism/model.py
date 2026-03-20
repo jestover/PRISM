@@ -2,11 +2,26 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from prism.utils import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class LabelTokenization:
+    """Result of in-context label tokenization."""
+
+    label_tokens: Dict[str, List[int]]
+    prompt_length: int
+    raw_prompt_length: int
+
+    @property
+    def n_absorbed(self) -> int:
+        """Number of prompt tokens absorbed into the label continuation."""
+        return self.raw_prompt_length - self.prompt_length
 
 
 class Model:
@@ -33,6 +48,16 @@ class Model:
         """Whether the model supports chain-of-thought reasoning."""
         return self.think_end is not None
 
+    def format_prompt(self, system_message: str, user_message: str) -> str:
+        """Build a prompt string using the model's chat template."""
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ]
+        return self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+
     def tokenize_prompt(self, system_message: str, user_message: str) -> List[int]:
         """Build a prompt using the model's chat template and tokenize it.
 
@@ -43,14 +68,7 @@ class Model:
         Returns:
             Token IDs for the full formatted prompt.
         """
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message},
-        ]
-        prompt = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        return self.tokenizer.encode(prompt)
+        return self.tokenizer.encode(self.format_prompt(system_message, user_message))
 
     def tokenize_labels(self, labels: List[str]) -> Dict[str, List[int]]:
         """Tokenize each label string into its token ID sequence.
@@ -65,6 +83,69 @@ class Model:
             label: self.tokenizer.encode(label, add_special_tokens=False)
             for label in labels
         }
+
+    def tokenize_labels_in_context(
+        self, labels: List[str], prompt_text: str
+    ) -> LabelTokenization:
+        """Tokenize labels as continuations of the given prompt text.
+
+        BPE tokenizers can absorb the final prompt token into the first label
+        token. This method finds the earliest stable prompt boundary shared
+        across all candidate labels and returns label token sequences from that
+        boundary onward.
+        """
+        prompt_tokens = self.tokenizer.encode(prompt_text)
+        raw_prompt_length = len(prompt_tokens)
+
+        combined_tokens: Dict[str, List[int]] = {}
+        divergence_points: Dict[str, int] = {}
+
+        for label in labels:
+            combined = self.tokenizer.encode(prompt_text + label)
+            combined_tokens[label] = combined
+
+            diverge = raw_prompt_length
+            for i in range(min(raw_prompt_length, len(combined))):
+                if combined[i] != prompt_tokens[i]:
+                    diverge = i
+                    break
+            divergence_points[label] = diverge
+
+        prompt_length = min(divergence_points.values())
+
+        label_tokens: Dict[str, List[int]] = {}
+        for label in labels:
+            combined = combined_tokens[label]
+            for i in range(prompt_length):
+                if combined[i] != prompt_tokens[i]:
+                    raise ValueError(
+                        f"Unexpected token mismatch at position {i} for label {label!r}"
+                    )
+
+            continuation = combined[prompt_length:]
+            if not continuation:
+                logger.warning(
+                    "Label %r produced an empty in-context continuation; "
+                    "falling back to isolated tokenization",
+                    label,
+                )
+                continuation = self.tokenizer.encode(label, add_special_tokens=False)
+
+            label_tokens[label] = continuation
+
+        if prompt_length < raw_prompt_length:
+            logger.info(
+                "BPE boundary: prompt cutoff backed up from %s to %s (%s absorbed)",
+                raw_prompt_length,
+                prompt_length,
+                raw_prompt_length - prompt_length,
+            )
+
+        return LabelTokenization(
+            label_tokens=label_tokens,
+            prompt_length=prompt_length,
+            raw_prompt_length=raw_prompt_length,
+        )
 
     def decode(self, tokens: List[int]) -> str:
         """Decode token IDs back to a string."""

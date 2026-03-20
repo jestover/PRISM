@@ -7,12 +7,16 @@ from prism.utils import get_logger
 
 logger = get_logger(__name__)
 
+TERMINAL_TOKEN = -1
+
 
 @dataclass
 class BranchPoint:
     """Point where label token sequences diverge.
 
     At each branch point we compute probabilities over the possible next tokens.
+    ``TERMINAL_TOKEN`` represents the case where one label ends but another
+    valid label continues from the same prefix.
     """
 
     prefix: List[int]
@@ -21,6 +25,10 @@ class BranchPoint:
 
 class LabelTokenTrie:
     """Build branching structure of label token sequences.
+
+    Prefix-overlap labels are represented with a synthetic terminal branch.
+    For example, ``["1", "10", "100"]`` yields a terminal branch at prefix
+    ``[1]`` for label ``"1"`` and a continuation branch for token ``0``.
 
     Example::
 
@@ -61,21 +69,28 @@ class LabelTokenTrie:
         if not active_labels:
             return
 
+        terminal_labels: List[str] = []
         next_token_groups: Dict[int, List[str]] = {}
 
         for label in active_labels:
             seq = self.label_sequences[label]
             if len(seq) == len(prefix):
+                terminal_labels.append(label)
                 continue
             next_token = seq[len(prefix)]
             if next_token not in next_token_groups:
                 next_token_groups[next_token] = []
             next_token_groups[next_token].append(label)
 
+        if terminal_labels:
+            next_token_groups[TERMINAL_TOKEN] = terminal_labels
+
         if len(next_token_groups) == 0:
             return
         elif len(next_token_groups) == 1:
             next_token = next(iter(next_token_groups))
+            if next_token == TERMINAL_TOKEN:
+                return
             labels = next_token_groups[next_token]
             self._find_branches_recursive(prefix + [next_token], labels, branch_points)
         else:
@@ -83,4 +98,6 @@ class LabelTokenTrie:
                 BranchPoint(prefix=prefix.copy(), branches=next_token_groups.copy())
             )
             for next_token, labels in next_token_groups.items():
+                if next_token == TERMINAL_TOKEN:
+                    continue
                 self._find_branches_recursive(prefix + [next_token], labels, branch_points)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
-from prism.core.token_trie import LabelTokenTrie
+from prism.core.token_trie import TERMINAL_TOKEN, LabelTokenTrie
 from prism.utils import get_logger
 
 if TYPE_CHECKING:
@@ -45,6 +45,32 @@ class LabelProbabilityComputer:
         self.trie = LabelTokenTrie(label_token_sequences)
         logger.info(f"Initialized probability computer for {len(label_token_sequences)} labels")
 
+    def _branch_probabilities(self, logits: Any, branches: Dict[int, List[str]]) -> Dict[int, float]:
+        """Compute branch probabilities, including terminal mass when needed."""
+        continuation_tokens = [token_id for token_id in branches if token_id != TERMINAL_TOKEN]
+
+        if TERMINAL_TOKEN in branches:
+            full_probs = self.backend.softmax(logits)
+            continuation_probs: List[float] = []
+            if continuation_tokens:
+                continuation_probs = full_probs[continuation_tokens].tolist()
+            continuation_mass = sum(continuation_probs)
+            terminal_prob = max(0.0, 1.0 - continuation_mass)
+
+            branch_probs = {
+                token_id: prob
+                for token_id, prob in zip(continuation_tokens, continuation_probs)
+            }
+            branch_probs[TERMINAL_TOKEN] = terminal_prob
+            return branch_probs
+
+        masked_logits = logits[continuation_tokens]
+        probs = self.backend.softmax(masked_logits).tolist()
+        return {
+            token_id: prob
+            for token_id, prob in zip(continuation_tokens, probs)
+        }
+
     def compute_probabilities(self, prompt_tokens: List[int]) -> Dict[str, float]:
         """Compute P(label) for each label.
 
@@ -60,12 +86,7 @@ class LabelProbabilityComputer:
             current_tokens = prompt_tokens + branch_point.prefix
             logits = self.backend.get_logits(current_tokens)
 
-            valid_tokens = list(branch_point.branches.keys())
-            masked_logits = logits[valid_tokens]
-            probs = self.backend.softmax(masked_logits)
-            probs_list = probs.tolist()
-
-            for token_id, prob in zip(valid_tokens, probs_list):
+            for token_id, prob in self._branch_probabilities(logits, branch_point.branches).items():
                 for label in branch_point.branches[token_id]:
                     label_probs[label] *= prob
 
@@ -139,12 +160,7 @@ class LabelProbabilityComputer:
                     logits = parent_logits
 
             # Extract probabilities at this branch point
-            valid_tokens = list(bp.branches.keys())
-            masked_logits = logits[valid_tokens]
-            probs = self.backend.softmax(masked_logits)
-            probs_list = probs.tolist()
-
-            for token_id, prob in zip(valid_tokens, probs_list):
+            for token_id, prob in self._branch_probabilities(logits, bp.branches).items():
                 for label in bp.branches[token_id]:
                     label_probs[label] *= prob
 
@@ -156,6 +172,7 @@ class LabelProbabilityComputer:
         stop_tokens: List[int],
         max_thinking_tokens: int = 2048,
         use_cache: bool = True,
+        n_absorbed: int = 0,
     ) -> COTResult:
         """Compute probabilities after allowing chain-of-thought reasoning.
 
@@ -168,6 +185,8 @@ class LabelProbabilityComputer:
             stop_tokens: Token sequence marking end of thinking phase.
             max_thinking_tokens: Maximum tokens for the thinking phase.
             use_cache: Whether to use KV cache during generation.
+            n_absorbed: Number of prompt tokens absorbed into the label
+                continuation by in-context tokenization.
 
         Returns:
             :class:`COTResult` with probabilities, thinking text, and tokens.
@@ -179,7 +198,8 @@ class LabelProbabilityComputer:
             prompt_tokens, stop_tokens, max_thinking_tokens, use_cache
         )
         thinking_text = self.decode(thinking_tokens)
-        probabilities = self.compute_probabilities(full_tokens)
+        effective_tokens = full_tokens[:-n_absorbed] if n_absorbed else full_tokens
+        probabilities = self.compute_probabilities(effective_tokens)
 
         return COTResult(
             probabilities=probabilities,

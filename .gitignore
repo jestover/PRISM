@@ -31,6 +31,5 @@ htmlcov/
 # uv
 uv.lock
 
-# Project docs (internal planning only)
-claude.md
-spec.md
+# Agent scratch space
+.claude/

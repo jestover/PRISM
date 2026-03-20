@@ -8,11 +8,19 @@ PRISM is a Python package for extracting full probability distributions from loc
 
 ## Status
 
-**Work in progress.** The core engine and high-level API work on a single machine (Apple Silicon via MLX, CUDA/CPU via PyTorch). Distributed computing (SLURM, Grid Engine) and checkpointing are planned but not yet implemented.
+**Alpha.** PRISM currently targets single-machine local inference (Apple Silicon via MLX, CUDA/CPU via PyTorch). Breaking changes are still expected while the probability-extraction contract is being hardened.
+
+The current near-term focus is correctness at the prompt/token boundary: in-context label tokenization, prompt-boundary absorption, prefix-overlap label handling, and parity between cached and uncached extraction. Distributed computing (SLURM, Grid Engine) and checkpointing remain future work.
+
+## Documentation
+
+- [`docs/overview.md`](docs/overview.md) for the project overview
+- [`docs/realignment.md`](docs/realignment.md) for the active roadmap
+- [`spec.md`](spec.md) for the detailed reference
 
 ## Relationship to GABRIEL
 
-[GABRIEL](https://github.com/openai/GABRIEL) is a Python library that wraps the OpenAI API and provides a clean, practical interface for researchers to classify and rate qualitative data at scale — in effect, Stata for LLM-based text measurement. Asirvatham, Mokski, & Shleifer introduced GABRIEL in their paper *GPT as a Measuremnt Tool*, which demonstrates that LLM-generated labels match human labels in reliability across hundreds of datasets.
+[GABRIEL](https://github.com/openai/GABRIEL) is a Python library that wraps the OpenAI API and provides a clean, practical interface for researchers to classify and rate qualitative data at scale — in effect, Stata for LLM-based text measurement. Asirvatham, Mokski, & Shleifer introduced GABRIEL in their paper *GPT as a Measurement Tool*, which demonstrates that LLM-generated labels match human labels in reliability across hundreds of datasets.
 
 PRISM builds on GABRIEL's contributions and is designed to complement it. Where GABRIEL calls the OpenAI API and returns a point estimate (a single label or rating), PRISM runs models locally and returns the full probability distribution over all possible labels. This reveals the model's uncertainty — two texts rated "50" might have very different distributions, one sharply peaked and the other bimodal — which is invisible in point estimates. The point estimate can always be recovered (it's just the mode or expected value), but the reverse is impossible.
 
@@ -129,7 +137,7 @@ Returns columns: `prob_true_toxic`, `predicted_toxic`, `prob_true_sarcastic`, `p
 
 ## How It Works
 
-PRISM works by examining the raw logits (pre-softmax scores) that an LLM produces at the token position where it would generate a label. Rather than letting the model sample a single token, PRISM computes the probabilities the model assigns to each possible label token and returns .
+PRISM works by examining the raw logits (pre-softmax scores) that an LLM produces at the token position where it would generate a label. Rather than letting the model sample a single token, PRISM computes the probabilities the model assigns to each possible label token and returns the full distribution over the candidate labels.
 
 ### Chain of Thought
 

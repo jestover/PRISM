@@ -116,10 +116,6 @@ def classify(
     logger.info(f"classify: {n} texts, {len(labels)} labels, use_reasoning={reasoning_active}")
 
     builder = PromptBuilder(random_seed=random_seed)
-    label_token_sequences = model.tokenize_labels(labels)
-    computer = LabelProbabilityComputer(
-        label_token_sequences, model.backend, decode=model.decode
-    )
 
     contexts = _resolve_contexts(context, n)
     all_probs: List[Optional[Dict[str, float]]] = [None] * n
@@ -136,9 +132,15 @@ def classify(
                 additional_instructions=additional_instructions,
                 shuffle=shuffle_labels,
             )
+            computer, n_absorbed = _build_probability_computer(
+                model, labels, system_msg, user_msg
+            )
             prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
             result = computer.compute_probabilities_with_cot(
-                prompt_tokens, model.think_end_tokens, max_thinking_tokens
+                prompt_tokens,
+                model.think_end_tokens,
+                max_thinking_tokens,
+                n_absorbed=n_absorbed,
             )
             all_probs[i] = result.probabilities
             all_thinking[i] = result.thinking_text
@@ -194,15 +196,20 @@ def classify(
         for ordering, row_indices in groups.items():
             # Level 1: cache ordering-specific prefix
             cascading.set_ordering(ordering, constant_context=constant_ctx)
+            system_msg = render_sys(ordering)
+            probe_user_msg = render_usr("", context=constant_ctx if ctx_is_constant else None)
+            computer, n_absorbed = _build_probability_computer(
+                model, list(ordering), system_msg, probe_user_msg
+            )
 
             for i in row_indices:
-                sys_msg = render_sys(ordering)
                 usr_msg = render_usr(texts[i], context=contexts[i])
-                prompt_tokens = model.tokenize_prompt(sys_msg, usr_msg)
+                prompt_tokens = model.tokenize_prompt(system_msg, usr_msg)
                 direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
+                effective_tokens = _effective_prompt_tokens(direct_tokens, n_absorbed)
 
                 # Level 2: forward row-specific suffix
-                logits, row_cache = cascading.forward_row(direct_tokens)
+                logits, row_cache = cascading.forward_row(effective_tokens)
 
                 # Level 3: compute probabilities at branch points
                 all_probs[i] = computer.compute_probabilities_cached(
@@ -277,19 +284,29 @@ def rate(
     logger.info(f"rate: {n} texts, attribute={attribute!r}, scale={scale_min}-{scale_max}")
 
     builder = PromptBuilder(random_seed=random_seed)
-    label_token_sequences = model.tokenize_labels(scale_labels)
-    computer = LabelProbabilityComputer(
-        label_token_sequences, model.backend, decode=model.decode
-    )
 
     contexts = _resolve_contexts(context, n)
     all_probs: List[Optional[Dict[str, float]]] = [None] * n
     all_thinking: List[Optional[str]] = [None] * n
+    system_msg = PromptBuilder.render_rate_system(
+        attribute=attribute,
+        attribute_description=attribute_description,
+        scale_min=scale_min,
+        scale_max=scale_max,
+        additional_instructions=additional_instructions,
+    )
+    probe_user_msg = PromptBuilder.render_rate_user(
+        "",
+        context=_get_constant_context(contexts) if _is_context_constant(contexts) else None,
+    )
+    computer, n_absorbed = _build_probability_computer(
+        model, scale_labels, system_msg, probe_user_msg
+    )
 
     if reasoning_active:
         # --- COT path: uncached ---
         for i, text in enumerate(texts):
-            system_msg, user_msg = builder.render_rate(
+            _, user_msg = builder.render_rate(
                 text=text,
                 attribute=attribute,
                 attribute_description=attribute_description,
@@ -300,7 +317,10 @@ def rate(
             )
             prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
             result = computer.compute_probabilities_with_cot(
-                prompt_tokens, model.think_end_tokens, max_thinking_tokens
+                prompt_tokens,
+                model.think_end_tokens,
+                max_thinking_tokens,
+                n_absorbed=n_absorbed,
             )
             all_probs[i] = result.probabilities
             all_thinking[i] = result.thinking_text
@@ -312,13 +332,6 @@ def rate(
         ctx_is_constant = _is_context_constant(contexts)
         constant_ctx = _get_constant_context(contexts) if ctx_is_constant else None
 
-        system_msg = PromptBuilder.render_rate_system(
-            attribute=attribute,
-            attribute_description=attribute_description,
-            scale_min=scale_min,
-            scale_max=scale_max,
-            additional_instructions=additional_instructions,
-        )
         render_usr = PromptBuilder.render_rate_user
 
         cascading = CascadingCache(
@@ -336,8 +349,9 @@ def rate(
             usr_msg = render_usr(text, context=contexts[i])
             prompt_tokens = model.tokenize_prompt(system_msg, usr_msg)
             direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
+            effective_tokens = _effective_prompt_tokens(direct_tokens, n_absorbed)
 
-            logits, row_cache = cascading.forward_row(direct_tokens)
+            logits, row_cache = cascading.forward_row(effective_tokens)
             all_probs[i] = computer.compute_probabilities_cached(
                 logits, row_cache
             )
@@ -419,10 +433,6 @@ def binary_classify(
 
     builder = PromptBuilder(random_seed=random_seed)
     binary_labels = ["true", "false"]
-    label_token_sequences = model.tokenize_labels(binary_labels)
-    computer = LabelProbabilityComputer(
-        label_token_sequences, model.backend, decode=model.decode
-    )
 
     contexts = _resolve_contexts(context, n)
     columns: Dict[str, list] = {}
@@ -431,11 +441,25 @@ def binary_classify(
         prob_trues: List[float] = []
         thinking_texts: List[Optional[str]] = []
         logger.info(f"binary_classify: starting label {label_name!r}")
+        system_msg = PromptBuilder.render_binary_classify_system(
+            label=label_name,
+            label_description=label_description,
+            additional_instructions=additional_instructions,
+        )
+        computer, n_absorbed = _build_probability_computer(
+            model,
+            binary_labels,
+            system_msg,
+            PromptBuilder.render_binary_classify_user(
+                "",
+                context=_get_constant_context(contexts) if _is_context_constant(contexts) else None,
+            ),
+        )
 
         if reasoning_active:
             # --- COT path: uncached ---
             for i, text in enumerate(texts):
-                system_msg, user_msg = builder.render_binary_classify(
+                _, user_msg = builder.render_binary_classify(
                     text=text,
                     label=label_name,
                     label_description=label_description,
@@ -444,7 +468,10 @@ def binary_classify(
                 )
                 prompt_tokens = model.tokenize_prompt(system_msg, user_msg)
                 result = computer.compute_probabilities_with_cot(
-                    prompt_tokens, model.think_end_tokens, max_thinking_tokens
+                    prompt_tokens,
+                    model.think_end_tokens,
+                    max_thinking_tokens,
+                    n_absorbed=n_absorbed,
                 )
                 prob_trues.append(result.probabilities["true"])
                 thinking_texts.append(result.thinking_text)
@@ -460,11 +487,6 @@ def binary_classify(
                 _get_constant_context(contexts) if ctx_is_constant else None
             )
 
-            system_msg = PromptBuilder.render_binary_classify_system(
-                label=label_name,
-                label_description=label_description,
-                additional_instructions=additional_instructions,
-            )
             render_usr = PromptBuilder.render_binary_classify_user
 
             cascading = CascadingCache(
@@ -482,8 +504,9 @@ def binary_classify(
                 usr_msg = render_usr(text, context=contexts[i])
                 prompt_tokens = model.tokenize_prompt(system_msg, usr_msg)
                 direct_tokens = _direct_prompt_tokens(prompt_tokens, model)
+                effective_tokens = _effective_prompt_tokens(direct_tokens, n_absorbed)
 
-                logits, row_cache = cascading.forward_row(direct_tokens)
+                logits, row_cache = cascading.forward_row(effective_tokens)
                 probs = computer.compute_probabilities_cached(logits, row_cache)
                 prob_trues.append(probs["true"])
                 thinking_texts.append(None)
@@ -519,6 +542,37 @@ def _direct_prompt_tokens(prompt_tokens: List[int], model: Model) -> List[int]:
     if model.think_end_tokens:
         return prompt_tokens + model.think_end_tokens
     return prompt_tokens
+
+
+def _build_probability_computer(
+    model: Model,
+    labels: List[str],
+    system_message: str,
+    user_message: str,
+) -> Tuple[LabelProbabilityComputer, int]:
+    """Create a probability computer and absorbed-token count for a prompt shape."""
+    prompt_text = model.format_prompt(system_message, user_message)
+    if model.think_end is not None:
+        prompt_text += model.think_end
+
+    tokenization = model.tokenize_labels_in_context(labels, prompt_text)
+    computer = LabelProbabilityComputer(
+        tokenization.label_tokens,
+        model.backend,
+        decode=model.decode,
+    )
+    return computer, tokenization.n_absorbed
+
+
+def _effective_prompt_tokens(prompt_tokens: List[int], n_absorbed: int) -> List[int]:
+    """Back up absorbed prompt tokens before probability extraction."""
+    if n_absorbed <= 0:
+        return prompt_tokens
+    if n_absorbed >= len(prompt_tokens):
+        raise ValueError(
+            f"n_absorbed ({n_absorbed}) must be smaller than prompt length ({len(prompt_tokens)})"
+        )
+    return prompt_tokens[:-n_absorbed]
 
 
 def _resolve_contexts(
