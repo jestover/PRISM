@@ -16,6 +16,7 @@ The current near-term focus is correctness at the prompt/token boundary: in-cont
 
 - [`docs/overview.md`](docs/overview.md) for the project overview
 - [`docs/realignment.md`](docs/realignment.md) for the active roadmap
+- [`docs/beta_task_list.md`](docs/beta_task_list.md) for the prioritized beta task list
 - [`spec.md`](spec.md) for the detailed reference
 
 ## Relationship to GABRIEL

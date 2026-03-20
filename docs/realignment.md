@@ -2,11 +2,13 @@
 
 ## Status
 
-Active as of March 18, 2026. Phase A is the only active implementation target. Phase B remains deferred until correctness is stable.
+Active as of March 20, 2026. Phase A is the only active implementation target. Phase B remains deferred until correctness is stable.
 
 ## Why This Exists
 
 The current project risk is correctness at the prompt/token boundary, not missing infrastructure. The realignment work focuses on making label probabilities trustworthy before expanding the API surface or distributed execution story.
+
+The prioritized beta work list now lives in [`docs/beta_task_list.md`](/Users/jes0129/code/prism/docs/beta_task_list.md). That document orders the concrete next steps from "must get right first" to "nice to have later."
 
 ## Phase A: Correctness
 
@@ -23,6 +25,7 @@ Still worth expanding before Phase B:
 - More real-model regression cases across MLX and Torch
 - More edge-case coverage for tokenizer-specific continuation behavior
 - Broader validation on representative research tasks
+- A clean beta API transition from `binary_classify` to `label` without weakening the current correctness contract
 
 ## Phase B: Deferred
 

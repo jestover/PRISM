@@ -2,7 +2,7 @@
 
 **PRobabilistic Inference for Structured Measurement**
 
-**Latest Update**: March 18, 2026
+**Latest Update**: March 20, 2026
 
 ## Table of Contents
 
@@ -89,6 +89,9 @@ GABRIEL's `get_all_responses()` accepts a `response_fn` parameter for dependency
 
 ## 3. Package API Surface
 
+Note on status:
+The current implemented public API is `classify()`, `rate()`, and `binary_classify()`. The beta roadmap in [`docs/beta_task_list.md`](/Users/jes0129/code/prism/docs/beta_task_list.md) targets `classify()`, `rate()`, and `label()` by renaming `binary_classify()` before beta rather than carrying both names forward.
+
 ### 3.1 Model Loading
 
 ```python
@@ -158,7 +161,9 @@ result = prism.rate(
 - `entropy` (float)
 - `thinking_text` (str — model's reasoning, only when `use_reasoning=True`)
 
-### 3.4 Binary Classify
+### 3.4 Binary Classify / Labeling
+
+Current implementation:
 
 ```python
 result = prism.binary_classify(
@@ -178,6 +183,12 @@ result = prism.binary_classify(
 )
 ```
 
+Planned beta naming:
+
+```python
+result = prism.label(...)
+```
+
 **Returns** DataFrame with original columns plus:
 - `prob_true_{label}` for each label (float)
 - `predicted_{label}` (bool — P(true) > 0.5)
@@ -186,6 +197,8 @@ result = prism.binary_classify(
 Each label is evaluated independently — multiple labels can be true simultaneously.
 
 ### 3.5 Multi-Attribute Rating
+
+Status: deferred and not implemented in the current branch.
 
 ```python
 results = prism.rate_multiple(
@@ -869,7 +882,7 @@ When `save_dir` is provided:
 - [ ] Job splitting, submission, monitoring, merging
 
 ### Phase 6: Packaging and Documentation
-- [ ] pyproject.toml, pip-installable
+- [x] pyproject.toml, pip-installable
 - [ ] API documentation
 - [ ] GABRIEL comparison examples
 - [ ] Guide: adding models, backends, schedulers
@@ -962,7 +975,7 @@ uv
 
 ## 14. Implementation Status
 
-**Last Updated**: March 18, 2026
+**Last Updated**: March 20, 2026
 
 ### Completed (Phases 1–3)
 
