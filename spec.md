@@ -31,7 +31,7 @@ PRISM takes qualitative text data, runs it through a local LLM, and returns prob
 
 - **Classify**: Probability distribution over mutually exclusive labels (e.g., sentiment categories)
 - **Rate**: Probability distribution over an integer scale (e.g., 0-100)
-- **Binary Classify**: Independent P(true)/P(false) for each of multiple labels (e.g., topic tags); planned beta rename: **Label**
+- **Label**: Independent P(true)/P(false) for each of multiple labels (e.g., topic tags)
 
 ### Why Probability Distributions Matter
 
@@ -90,7 +90,7 @@ GABRIEL's `get_all_responses()` accepts a `response_fn` parameter for dependency
 ## 3. Package API Surface
 
 Note on status:
-The current implemented public API is `classify()`, `rate()`, and `binary_classify()`. The beta roadmap in [`docs/beta_task_list.md`](/Users/jes0129/code/prism/docs/beta_task_list.md) targets `classify()`, `rate()`, and `label()` by renaming `binary_classify()` before beta rather than carrying both names forward.
+The current implemented public API is `classify()`, `rate()`, and `label()`.
 
 ### 3.1 Model Loading
 
@@ -161,12 +161,10 @@ result = prism.rate(
 - `entropy` (float)
 - `thinking_text` (str — model's reasoning, only when `use_reasoning=True`)
 
-### 3.4 Binary Classify / Labeling
-
-Current implementation:
+### 3.4 Label
 
 ```python
-result = prism.binary_classify(
+result = prism.label(
     df,
     column_name="text",
     labels={
@@ -181,12 +179,6 @@ result = prism.binary_classify(
     random_seed=None,
     save_dir=None,                          # not yet implemented
 )
-```
-
-Planned beta naming:
-
-```python
-result = prism.label(...)
 ```
 
 **Returns** DataFrame with original columns plus:
@@ -555,10 +547,10 @@ Text: {text}
 Rating: """
 ```
 
-### 7.4 Binary Classify Template
+### 7.4 Label Template
 
 ```python
-BINARY_CLASSIFY_SYSTEM = """\
+LABEL_SYSTEM = """\
 You are evaluating whether a label applies to the provided text.
 
 Label: {label}
@@ -568,7 +560,7 @@ Label: {label}
 Respond with ONLY "true" if the label applies, or "false" if it does not. \
 No explanation."""
 
-BINARY_CLASSIFY_USER = """\
+LABEL_USER = """\
 {context_block}\
 Text: {text}
 
@@ -599,7 +591,7 @@ class PromptBuilder:
                     additional_instructions=None):
         """Returns (system_message, user_message)."""
 
-    def render_binary_classify(self, text, label, label_description=None,
+    def render_label(self, text, label, label_description=None,
                                context=None, additional_instructions=None):
         """Returns (system_message, user_message)."""
 ```
@@ -813,7 +805,7 @@ Subclass `JobScheduler`, implement the four abstract methods, pass instance via 
 | `entropy` | float | Shannon entropy (bits) |
 | `thinking_text` | str | Model's reasoning (COT only) |
 
-**Binary Classify**:
+**Label**:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -852,14 +844,14 @@ Intended behavior when `save_dir` is implemented:
 - [x] Packaging: pyproject.toml, pip-installable from GitHub
 
 ### Phase 2: Prompt Templates ✓
-- [x] Write classify/rate/binary_classify templates
+- [x] Write classify/rate/label templates
 - [x] Implement `PromptBuilder` with label shuffling (controlled by `shuffle` parameter)
 - [x] Test prompt rendering with gpt-oss-20b chat template
 - [ ] Test prompt rendering with additional models' chat templates
 - [ ] Document comparison with GABRIEL's templates
 
 ### Phase 3: High-Level API ✓
-- [x] Implement `prism.classify()`, `prism.rate()`, `prism.binary_classify()`
+- [x] Implement `prism.classify()`, `prism.rate()`, `prism.label()`
 - [x] DataFrame in → probability extraction → DataFrame out
 - [x] Summary statistics (entropy, expected value, std dev)
 - [x] Support both Polars and Pandas
@@ -895,8 +887,8 @@ Intended behavior when `save_dir` is implemented:
 ```
 prism/
 ├── src/prism/
-│   ├── __init__.py                     # Public API: classify, rate, binary_classify, load_model
-│   ├── api.py                          # classify(), rate(), binary_classify()
+│   ├── __init__.py                     # Public API: classify, rate, label, load_model
+│   ├── api.py                          # classify(), rate(), label()
 │   ├── model.py                        # load_model(), Model
 │   ├── backends/
 │   │   ├── __init__.py                 # Exports InferenceBackend
@@ -983,7 +975,7 @@ All code migrated from the sentiment analysis project, refactored, and working:
 
 | File | Status | Notes |
 |------|--------|-------|
-| `src/prism/__init__.py` | ✓ | Public API: classify, rate, binary_classify, load_model, set_log_level (beta rename to `label` planned) |
+| `src/prism/__init__.py` | ✓ | Public API: classify, rate, label, load_model, set_log_level |
 | `src/prism/api.py` | ✓ | All three API functions, Polars + Pandas support, COT thinking_text |
 | `src/prism/model.py` | ✓ | Flattened Model class, load_model with auto-detection |
 | `src/prism/backends/base.py` | ✓ | InferenceBackend ABC |
@@ -1019,6 +1011,6 @@ All code migrated from the sentiment analysis project, refactored, and working:
 - Checkpointing and resume for long runs
 - Job scheduling (SLURM, Grid Engine, Local)
 - Multi-attribute rating (`rate_multiple`)
-- Torch backend COT test (direct mode verified — classify, rate, binary_classify all pass on CPU)
+- Torch backend COT test (direct mode verified — classify, rate, label all pass on CPU)
 - API documentation
 - Tutorial notebook

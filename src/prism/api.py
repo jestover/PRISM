@@ -1,4 +1,4 @@
-"""High-level API: classify, rate, binary_classify."""
+"""High-level API: classify, rate, label."""
 
 from __future__ import annotations
 
@@ -389,11 +389,11 @@ def rate(
 
 
 # ---------------------------------------------------------------------------
-# binary_classify
+# label
 # ---------------------------------------------------------------------------
 
 
-def binary_classify(
+def label(
     df,
     column_name: str,
     labels: Dict[str, Optional[str]],
@@ -406,7 +406,7 @@ def binary_classify(
     random_seed: Optional[int] = None,
     save_dir: Optional[str] = None,
 ):
-    """Evaluate independent true/false for each label.
+    """Evaluate independent true/false applicability for each label.
 
     Args:
         df: Polars or Pandas DataFrame.
@@ -429,7 +429,7 @@ def binary_classify(
     texts = _get_column(df, column_name)
     n = len(texts)
     reasoning_active = use_reasoning and model.can_reason
-    logger.info(f"binary_classify: {n} texts, {len(labels)} labels")
+    logger.info(f"label: {n} texts, {len(labels)} labels")
 
     builder = PromptBuilder(random_seed=random_seed)
     binary_labels = ["true", "false"]
@@ -440,8 +440,8 @@ def binary_classify(
     for label_name, label_description in labels.items():
         prob_trues: List[float] = []
         thinking_texts: List[Optional[str]] = []
-        logger.info(f"binary_classify: starting label {label_name!r}")
-        system_msg = PromptBuilder.render_binary_classify_system(
+        logger.info(f"label: starting label {label_name!r}")
+        system_msg = PromptBuilder.render_label_system(
             label=label_name,
             label_description=label_description,
             additional_instructions=additional_instructions,
@@ -450,7 +450,7 @@ def binary_classify(
             model,
             binary_labels,
             system_msg,
-            PromptBuilder.render_binary_classify_user(
+            PromptBuilder.render_label_user(
                 "",
                 context=_get_constant_context(contexts) if _is_context_constant(contexts) else None,
             ),
@@ -459,7 +459,7 @@ def binary_classify(
         if reasoning_active:
             # --- COT path: uncached ---
             for i, text in enumerate(texts):
-                _, user_msg = builder.render_binary_classify(
+                _, user_msg = builder.render_label(
                     text=text,
                     label=label_name,
                     label_description=label_description,
@@ -478,7 +478,7 @@ def binary_classify(
 
                 if (i + 1) % 100 == 0 or i == n - 1:
                     logger.info(
-                        f"binary_classify [{label_name}]: processed {i + 1}/{n}"
+                        f"label [{label_name}]: processed {i + 1}/{n}"
                     )
         else:
             # --- Non-COT path: CascadingCache (one per label) ---
@@ -487,7 +487,7 @@ def binary_classify(
                 _get_constant_context(contexts) if ctx_is_constant else None
             )
 
-            render_usr = PromptBuilder.render_binary_classify_user
+            render_usr = PromptBuilder.render_label_user
 
             cascading = CascadingCache(
                 backend=model.backend,
@@ -513,7 +513,7 @@ def binary_classify(
 
                 if (i + 1) % 100 == 0 or i == n - 1:
                     logger.info(
-                        f"binary_classify [{label_name}]: processed {i + 1}/{n}"
+                        f"label [{label_name}]: processed {i + 1}/{n}"
                     )
 
         columns[f"prob_true_{label_name}"] = prob_trues

@@ -218,7 +218,7 @@ class CascadingCache:
     def set_fixed_prefix(self, system_msg: str, constant_context: Optional[str] = None) -> None:
         """Build Level 1 cache for tasks without label shuffling.
 
-        For ``rate()`` and ``binary_classify()`` (and ``classify()`` with
+        For ``rate()`` and ``label()`` (and ``classify()`` with
         ``shuffle_labels=False``), the system message is constant.
         Level 0 and Level 1 collapse into a single cache.
 

@@ -13,7 +13,7 @@ Use PRISM when you need label probabilities, uncertainty metrics, or local/open-
 
 ## Design Principles
 
-- GABRIEL-like top-level API: current code exposes `classify`, `rate`, and `binary_classify`; the beta target is `classify`, `rate`, and `label`
+- GABRIEL-like top-level API: `classify`, `rate`, and `label`
 - Local inference only: no API-only backends
 - Backend abstraction for MLX and PyTorch
 - Efficiency through trie-based branch evaluation and prompt-cache reuse

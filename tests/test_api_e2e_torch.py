@@ -151,7 +151,7 @@ class TestRate:
         assert "entropy" in result.columns
         assert result.shape[0] == 3
 
-        print(f"\nRate (direct, torch):")
+        print("\nRate (direct, torch):")
         for i in range(3):
             print(
                 f"  Row {i}: expected={result['expected_value'][i]:.1f}, "
@@ -163,13 +163,13 @@ class TestRate:
 
 
 # ---------------------------------------------------------------------------
-# Binary Classify
+# Label
 # ---------------------------------------------------------------------------
 
 
-class TestBinaryClassify:
+class TestLabel:
     def test_direct(self, model, sample_df):
-        result = prism.binary_classify(
+        result = prism.label(
             sample_df,
             column_name="text",
             labels={
@@ -184,7 +184,7 @@ class TestBinaryClassify:
         assert "prob_true_factual_statement" in result.columns
         assert "predicted_factual_statement" in result.columns
 
-        print(f"\nBinary classify (direct, torch):")
+        print("\nLabel (direct, torch):")
         for i in range(3):
             print(
                 f"  Row {i}: positive_sentiment={result['prob_true_positive_sentiment'][i]:.3f}, "

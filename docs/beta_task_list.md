@@ -13,25 +13,25 @@ PRISM should only promise what the code and tests can defend. The first step tow
 
 1. Tighten `spec.md` so the implemented API, deferred features, and planned beta changes are clearly separated.
 2. Remove or clearly mark unsupported claims around `rate_multiple`, checkpointing, scheduling, and other deferred features in public docs.
-3. Add a single "current behavior vs beta target" API table covering `classify`, `rate`, and `binary_classify` -> `label`.
+3. Add a single API contract table covering `classify`, `rate`, and `label`.
 4. Add a dedicated "supported-model matrix" doc section with the currently verified MLX and Torch paths, even if the matrix is initially small.
 
-### Goal 2: Freeze the beta API around `classify`, `rate`, and `label`
+### Goal 2: Harden the beta API around `classify`, `rate`, and `label`
 
 Why this comes second:
-Users cannot build trust if the top-level verbs keep shifting. PRISM should settle the public task names before beta and only expand after those names are stable and well tested.
+Users cannot build trust if the top-level verbs keep shifting or if their semantics remain fuzzy. Now that the public names are `classify`, `rate`, and `label`, the next step is to harden what each one guarantees.
 
-5. Add `prism.label()` as the intended public name for independent yes/no labeling.
-6. Rename the public API from `binary_classify()` to `label()` and update imports, docs, and examples in the same change.
-7. Define the intended `label()` behavior and output contract directly in tests, without treating `binary_classify()` as the reference implementation.
-8. Remove `binary_classify()` from the documented public surface before beta so the top-level trio is just `classify`, `rate`, and `label`.
+5. Add cheap regression tests that define the intended `label()` behavior and output contract directly.
+6. Audit examples and docs so `label()` is consistently described as independent true/false applicability rather than exclusive classification.
+7. Add a compact public API contract table in the docs covering inputs, outputs, and summary columns for `classify`, `rate`, and `label`.
+8. Review column naming and helper text to make sure `label()` reads naturally for research users.
 
 ### Goal 3: Align the core prompt templates with GABRIEL where it helps users
 
 Why this comes third:
 Prompt wording is part of the user-facing contract. Before beta, PRISM should intentionally decide how close its templates should be to GABRIEL's `rate` and `classify` prompts, while preserving PRISM-specific answer boundaries for probability extraction.
 
-9. Review the current `rate`, `binary_classify`/`label`, and `classify` templates against GABRIEL's task prompts and document the meaningful similarities and differences.
+9. Review the current `rate`, `label`, and `classify` templates against GABRIEL's task prompts and document the meaningful similarities and differences.
 10. Update the `rate` template so it is roughly equivalent in intent and guidance to GABRIEL's `rate` template, while still ending in a stable numeric answer slot.
 11. Update the `label` template so it is roughly equivalent in intent and guidance to GABRIEL's `classify` template, while still ending in a stable true/false answer slot.
 12. Update the PRISM `classify` template so it is clearly analogous to GABRIEL's task style but explicitly tailored for mutually exclusive label distributions.

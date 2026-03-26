@@ -11,13 +11,13 @@ Quick start::
     result = prism.classify(df, "text", labels=["positive", "negative", "neutral"], model=model)
 """
 
-from prism.api import binary_classify, classify, rate
+from prism.api import classify, label, rate
 from prism.model import Model, load_model
 from prism.utils import set_log_level
 
 __all__ = [
-    "binary_classify",
     "classify",
+    "label",
     "load_model",
     "Model",
     "rate",

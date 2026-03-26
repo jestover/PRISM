@@ -25,7 +25,6 @@ Still worth expanding before Phase B:
 - More real-model regression cases across MLX and Torch
 - More edge-case coverage for tokenizer-specific continuation behavior
 - Broader validation on representative research tasks
-- A clean beta API transition from `binary_classify` to `label` without weakening the current correctness contract
 - Prompt-template alignment so `rate` and `label` are meaningfully comparable to GABRIEL's task prompts and `classify` is analogous but PRISM-specific
 
 ## Phase B: Deferred

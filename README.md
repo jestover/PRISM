@@ -12,7 +12,7 @@ PRISM is a Python package for extracting full probability distributions from loc
 
 The current near-term focus is correctness at the prompt/token boundary: in-context label tokenization, prompt-boundary absorption, prefix-overlap label handling, and parity between cached and uncached extraction. Distributed computing (SLURM, Grid Engine) and checkpointing remain future work.
 
-The intended beta task surface is `classify`, `rate`, and `label`. Current code still exposes `binary_classify()` while that rename is pending.
+The current top-level task surface is `classify`, `rate`, and `label`.
 
 ## Documentation
 
@@ -120,14 +120,12 @@ result = prism.rate(
 
 Returns columns: `prob_0` through `prob_100`, `expected_value`, `std_dev`, `mode`, `entropy`.
 
-### Binary Classify
-
-Current implementation; planned beta rename: `label`.
+### Label
 
 Independent true/false evaluation for multiple labels:
 
 ```python
-result = prism.binary_classify(
+result = prism.label(
     df,
     column_name="text",
     labels={

@@ -1,6 +1,6 @@
 """Tests for the token trie branch point detection."""
 
-from prism.core.token_trie import BranchPoint, LabelTokenTrie
+from prism.core.token_trie import LabelTokenTrie
 
 
 def test_docstring_example():

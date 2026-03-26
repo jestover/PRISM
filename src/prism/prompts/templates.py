@@ -53,10 +53,10 @@ Text: {text}
 Rating: """
 
 # ---------------------------------------------------------------------------
-# Binary classify
+# Label
 # ---------------------------------------------------------------------------
 
-BINARY_CLASSIFY_SYSTEM = """\
+LABEL_SYSTEM = """\
 You are evaluating whether a label applies to the provided text.
 
 Label: {label}
@@ -65,7 +65,7 @@ Label: {label}
 Respond with ONLY "true" if the label applies, or "false" if it does not. \
 No explanation."""
 
-BINARY_CLASSIFY_USER = """\
+LABEL_USER = """\
 {context_block}\
 Text: {text}
 
@@ -163,7 +163,7 @@ class PromptBuilder:
 
         return system, user
 
-    def render_binary_classify(
+    def render_label(
         self,
         text: str,
         label: str,
@@ -171,7 +171,7 @@ class PromptBuilder:
         context: Optional[str] = None,
         additional_instructions: Optional[str] = None,
     ) -> Tuple[str, str]:
-        """Render a binary classify prompt.
+        """Render a label prompt.
 
         Returns:
             ``(system_message, user_message)``
@@ -182,12 +182,12 @@ class PromptBuilder:
         additional_instructions_block = self._additional_instructions_block(additional_instructions)
         context_block = self._context_block(context)
 
-        system = BINARY_CLASSIFY_SYSTEM.format(
+        system = LABEL_SYSTEM.format(
             label=label,
             label_description_block=label_description_block,
             additional_instructions_block=additional_instructions_block,
         )
-        user = BINARY_CLASSIFY_USER.format(context_block=context_block, text=text)
+        user = LABEL_USER.format(context_block=context_block, text=text)
 
         return system, user
 
@@ -264,12 +264,12 @@ class PromptBuilder:
         return RATE_USER.format(context_block=context_block, text=text)
 
     @staticmethod
-    def render_binary_classify_system(
+    def render_label_system(
         label: str,
         label_description: Optional[str] = None,
         additional_instructions: Optional[str] = None,
     ) -> str:
-        """Render only the system message for a binary classify prompt."""
+        """Render only the system message for a label prompt."""
         label_description_block = (
             f"Description: {label_description}\n\n"
             if label_description
@@ -278,20 +278,20 @@ class PromptBuilder:
         additional_instructions_block = PromptBuilder._additional_instructions_block(
             additional_instructions
         )
-        return BINARY_CLASSIFY_SYSTEM.format(
+        return LABEL_SYSTEM.format(
             label=label,
             label_description_block=label_description_block,
             additional_instructions_block=additional_instructions_block,
         )
 
     @staticmethod
-    def render_binary_classify_user(
+    def render_label_user(
         text: str,
         context: Optional[str] = None,
     ) -> str:
-        """Render only the user message for a binary classify prompt."""
+        """Render only the user message for a label prompt."""
         context_block = PromptBuilder._context_block(context)
-        return BINARY_CLASSIFY_USER.format(context_block=context_block, text=text)
+        return LABEL_USER.format(context_block=context_block, text=text)
 
     # -- helpers --
 

@@ -41,7 +41,7 @@ class FakeTokenizer:
     TASK_TOKENS = {
         "classify": 10,
         "rate": 20,
-        "binary": 30,
+        "label": 30,
     }
 
     ISOLATED_LABEL_TOKENS = {
@@ -79,7 +79,7 @@ class FakeTokenizer:
             task = "rate"
             suffix = "\n\nRating: "
         elif "Applies: " in user_message:
-            task = "binary"
+            task = "label"
             suffix = "\n\nApplies: "
         else:
             raise ValueError(f"Unsupported user message: {user_message!r}")
@@ -324,6 +324,35 @@ def test_classify_uses_in_context_label_tokenization():
     assert result["predicted_class"][0] == "alpha"
     assert result["prob_alpha"][0] == pytest.approx(0.9, abs=1e-9)
     assert result["prob_beta"][0] == pytest.approx(0.1, abs=1e-9)
+
+
+def test_label_returns_independent_true_false_probabilities():
+    tokenizer = FakeTokenizer()
+    text = "great"
+    base_state = tuple(tokenizer.base_tokens("label", text))
+    backend = FakeBackend(
+        {
+            (30,): {0: 1.0},
+            base_state: {
+                40: 0.55,
+                41: 0.05,
+                400: 0.05,
+                401: 0.35,
+            }
+        }
+    )
+    model = _make_model(backend, tokenizer)
+    df = pl.DataFrame({"text": [text]})
+
+    result = prism.label(
+        df,
+        column_name="text",
+        labels={"applies": "Applies to the text"},
+        model=model,
+    )
+
+    assert result["prob_true_applies"][0] == pytest.approx(0.9166666667, abs=1e-9)
+    assert result["predicted_applies"][0] is True
 
 
 def test_reasoning_and_direct_paths_share_distribution_contract():
