@@ -19,6 +19,7 @@ The current top-level task surface is `classify`, `rate`, and `label`.
 - [`docs/overview.md`](docs/overview.md) for the project overview
 - [`docs/realignment.md`](docs/realignment.md) for the active roadmap
 - [`docs/beta_task_list.md`](docs/beta_task_list.md) for the prioritized beta task list
+- [`docs/prompt_alignment.md`](docs/prompt_alignment.md) for the current prompt-template comparison against GABRIEL
 - [`spec.md`](spec.md) for the detailed reference
 
 ## Relationship to GABRIEL

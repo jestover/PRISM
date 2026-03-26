@@ -19,13 +19,14 @@ Implemented in the current branch:
 - Terminal trie branches for prefix-overlap labels
 - Shared branch-probability logic for cached and uncached traversal
 - Lightweight fake-backend/tokenizer regression tests
+- Initial prompt-template alignment to GABRIEL-style calibration language for `classify`, `rate`, and `label`
+- Prompt-focused regression tests for stable answer boundaries and key template invariants
 
 Still worth expanding before Phase B:
 
 - More real-model regression cases across MLX and Torch
 - More edge-case coverage for tokenizer-specific continuation behavior
 - Broader validation on representative research tasks
-- Prompt-template alignment so `rate` and `label` are meaningfully comparable to GABRIEL's task prompts and `classify` is analogous but PRISM-specific
 
 ## Phase B: Deferred
 

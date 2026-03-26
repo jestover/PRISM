@@ -92,6 +92,18 @@ GABRIEL's `get_all_responses()` accepts a `response_fn` parameter for dependency
 Note on status:
 The current implemented public API is `classify()`, `rate()`, and `label()`.
 
+### 3.0 API Contract Summary
+
+| Function | Task shape | Core input | Probability outputs | Summary outputs |
+|----------|------------|------------|---------------------|-----------------|
+| `classify()` | Mutually exclusive labels | `labels=[...]` | `prob_{label}` | `predicted_class`, `max_prob`, `entropy`, `thinking_text` |
+| `rate()` | Integer scale distribution | `attribute=...`, `scale_min`, `scale_max` | `prob_{i}` | `expected_value`, `std_dev`, `mode`, `entropy`, `thinking_text` |
+| `label()` | Independent true/false applicability | `labels={label: description}` | `prob_true_{label}` | `predicted_{label}`, `thinking_text_{label}` |
+
+Notes:
+- `thinking_text` columns are present only when `use_reasoning=True`.
+- `label()` evaluates each label independently, so multiple labels can be true for the same row.
+
 ### 3.1 Model Loading
 
 ```python
@@ -509,6 +521,11 @@ You are classifying text. For the text provided, select the single most \
 appropriate label from the list below.
 
 {label_descriptions_block}\
+Treat the labels as mutually exclusive for this task. Base your judgment on \
+the text itself. If label definitions are provided, use them to anchor your \
+decision. If several labels seem plausible, choose the single best-fitting \
+label.
+
 {additional_instructions_block}\
 Respond with ONLY the label name, exactly as written. No explanation."""
 
@@ -536,6 +553,11 @@ Rating scale:
 {scale_max} = extreme or overwhelmingly present
 Use the full range. Do not round to multiples of 5 or 10.
 Consider intermediate values (e.g., 19, 67, 32) to capture nuance.
+Measure only the direct signal of this attribute in the text itself. Do not \
+infer the rating from related traits, broad impressions, or other implied \
+attributes.
+Extremes should be rare. Double-check before using values near the ends of the \
+scale.
 
 {additional_instructions_block}\
 Respond with ONLY the integer. No explanation."""
@@ -551,13 +573,17 @@ Rating: """
 
 ```python
 LABEL_SYSTEM = """\
-You are evaluating whether a label applies to the provided text.
+You are evaluating whether a specific label applies to the provided text.
 
 Label: {label}
 {label_description_block}\
+Judge this label independently based only on direct evidence in the text. Do \
+not infer it from other possible labels, related traits, or broad impressions.
+If the evidence is absent, ambiguous, or too weak, respond false.
 
 {additional_instructions_block}\
-Respond with ONLY "true" if the label applies, or "false" if it does not. \
+Respond with ONLY "true" if the label clearly applies, or "false" if it does \
+not. \
 No explanation."""
 
 LABEL_USER = """\
@@ -848,7 +874,8 @@ Intended behavior when `save_dir` is implemented:
 - [x] Implement `PromptBuilder` with label shuffling (controlled by `shuffle` parameter)
 - [x] Test prompt rendering with gpt-oss-20b chat template
 - [ ] Test prompt rendering with additional models' chat templates
-- [ ] Document comparison with GABRIEL's templates
+- [x] Document comparison with GABRIEL's templates
+- [x] Add prompt-focused tests for stable answer boundaries and calibration language
 
 ### Phase 3: High-Level API ✓
 - [x] Implement `prism.classify()`, `prism.rate()`, `prism.label()`

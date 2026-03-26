@@ -31,6 +31,9 @@ Users cannot build trust if the top-level verbs keep shifting or if their semant
 Why this comes third:
 Prompt wording is part of the user-facing contract. Before beta, PRISM should intentionally decide how close its templates should be to GABRIEL's `rate` and `classify` prompts, while preserving PRISM-specific answer boundaries for probability extraction.
 
+Status on March 26, 2026:
+An initial pass is now in place. The repo has a prompt-alignment note, updated `classify`/`rate`/`label` templates, and prompt-focused tests for stable answer boundaries. Additional prompt work should now be driven by observed failures, stronger validation on real research tasks, or deliberate API changes.
+
 9. Review the current `rate`, `label`, and `classify` templates against GABRIEL's task prompts and document the meaningful similarities and differences.
 10. Update the `rate` template so it is roughly equivalent in intent and guidance to GABRIEL's `rate` template, while still ending in a stable numeric answer slot.
 11. Update the `label` template so it is roughly equivalent in intent and guidance to GABRIEL's `classify` template, while still ending in a stable true/false answer slot.

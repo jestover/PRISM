@@ -35,9 +35,20 @@ Use PRISM when you need label probabilities, uncertainty metrics, or local/open-
 - Phase A correctness work is the active priority: in-context label tokenization, prompt-boundary absorption, prefix-overlap label handling, and parity between cached and uncached extraction.
 - Distributed scheduling, checkpoint/resume, and broader API redesign are deferred until correctness is stable.
 
+## API Contract
+
+| Function | Task shape | Core input | Core outputs | Summary columns |
+|----------|------------|------------|--------------|-----------------|
+| `classify` | Mutually exclusive labels | `labels=[...]` | `prob_{label}` | `predicted_class`, `max_prob`, `entropy` |
+| `rate` | Integer scale distribution | `attribute=...`, `scale_min`, `scale_max` | `prob_{i}` | `expected_value`, `std_dev`, `mode`, `entropy` |
+| `label` | Independent true/false applicability | `labels={label: description}` | `prob_true_{label}` | `predicted_{label}` |
+
+When `use_reasoning=True`, `classify` and `rate` add `thinking_text`, and `label` adds `thinking_text_{label}`.
+
 ## Key Docs
 
 - [`docs/realignment.md`](/Users/jes0129/code/prism/docs/realignment.md): active roadmap
 - [`docs/beta_task_list.md`](/Users/jes0129/code/prism/docs/beta_task_list.md): prioritized beta task list
+- [`docs/prompt_alignment.md`](/Users/jes0129/code/prism/docs/prompt_alignment.md): prompt-template comparison against GABRIEL and current alignment notes
 - [`spec.md`](/Users/jes0129/code/prism/spec.md): detailed reference
 - [`README.md`](/Users/jes0129/code/prism/README.md): public-facing summary

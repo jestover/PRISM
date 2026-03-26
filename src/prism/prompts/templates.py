@@ -18,6 +18,11 @@ You are classifying text. For the text provided, select the single most \
 appropriate label from the list below.
 
 {label_descriptions_block}\
+Treat the labels as mutually exclusive for this task. Base your judgment on \
+the text itself. If label definitions are provided, use them to anchor your \
+decision. If several labels seem plausible, choose the single best-fitting \
+label.
+
 {additional_instructions_block}\
 Respond with ONLY the label name, exactly as written. No explanation."""
 
@@ -42,6 +47,11 @@ Rating scale:
 {scale_max} = extreme or overwhelmingly present
 Use the full range. Do not round to multiples of 5 or 10.
 Consider intermediate values (e.g., 19, 67, 32) to capture nuance.
+Measure only the direct signal of this attribute in the text itself. Do not \
+infer the rating from related traits, broad impressions, or other implied \
+attributes.
+Extremes should be rare. Double-check before using values near the ends of the \
+scale.
 
 {additional_instructions_block}\
 Respond with ONLY the integer. No explanation."""
@@ -57,12 +67,17 @@ Rating: """
 # ---------------------------------------------------------------------------
 
 LABEL_SYSTEM = """\
-You are evaluating whether a label applies to the provided text.
+You are evaluating whether a specific label applies to the provided text.
 
 Label: {label}
 {label_description_block}\
+Judge this label independently based only on direct evidence in the text. Do \
+not infer it from other possible labels, related traits, or broad impressions.
+If the evidence is absent, ambiguous, or too weak, respond false.
+
 {additional_instructions_block}\
-Respond with ONLY "true" if the label applies, or "false" if it does not. \
+Respond with ONLY "true" if the label clearly applies, or "false" if it does \
+not. \
 No explanation."""
 
 LABEL_USER = """\
