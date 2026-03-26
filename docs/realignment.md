@@ -2,7 +2,7 @@
 
 ## Status
 
-Active as of March 20, 2026. Phase A is the only active implementation target. Phase B remains deferred until correctness is stable.
+Active as of March 26, 2026. Phase A is the only active implementation target. Phase B remains deferred until correctness is stable.
 
 ## Why This Exists
 
@@ -26,6 +26,7 @@ Still worth expanding before Phase B:
 - More edge-case coverage for tokenizer-specific continuation behavior
 - Broader validation on representative research tasks
 - A clean beta API transition from `binary_classify` to `label` without weakening the current correctness contract
+- Prompt-template alignment so `rate` and `label` are meaningfully comparable to GABRIEL's task prompts and `classify` is analogous but PRISM-specific
 
 ## Phase B: Deferred
 

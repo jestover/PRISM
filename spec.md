@@ -2,7 +2,7 @@
 
 **PRobabilistic Inference for Structured Measurement**
 
-**Latest Update**: March 20, 2026
+**Latest Update**: March 26, 2026
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ PRISM takes qualitative text data, runs it through a local LLM, and returns prob
 
 - **Classify**: Probability distribution over mutually exclusive labels (e.g., sentiment categories)
 - **Rate**: Probability distribution over an integer scale (e.g., 0-100)
-- **Binary Classify**: Independent P(true)/P(false) for each of multiple labels (e.g., topic tags)
+- **Binary Classify**: Independent P(true)/P(false) for each of multiple labels (e.g., topic tags); planned beta rename: **Label**
 
 ### Why Probability Distributions Matter
 
@@ -47,9 +47,9 @@ The analogy: GABRIEL runs a regression and gives you the coefficient. PRISM give
 ### Design Philosophy
 
 - **GABRIEL-compatible**: Familiar API for researchers who know GABRIEL
-- **Any model**: Works with any HuggingFace-compatible model, no hardcoded configs
+- **Model-agnostic prompt handling**: Uses the model's tokenizer/chat template rather than hardcoded prompt adapters
 - **Efficient**: Trie-based computation evaluates only at branch points, not every token
-- **Scalable**: From a laptop (MLX) to a cluster (SLURM, Grid Engine)
+- **Single-machine first**: MLX and Torch are the active targets; distributed execution remains deferred
 - **Simple**: `.format()` templates, clean abstractions, minimal dependencies
 
 ---
@@ -75,7 +75,7 @@ PRISM runs the model locally and gets: `{0: 0.001, ..., 42: 0.08, 43: 0.07, ...,
 
 ### Compatibility Goals
 
-- Same function names: `classify()`, `rate()`
+- Comparable task vocabulary: `rate()` should stay close to GABRIEL's `rate()`, and PRISM's planned `label()` corresponds most closely to GABRIEL's `classify()`
 - Same input format: DataFrame with text column + label/attribute definitions
 - Same output base: DataFrame with result columns (plus additional probability columns)
 - Similar prompt structure: Based on GABRIEL's validated templates, adapted for direct label generation
@@ -409,7 +409,7 @@ def _detect_backend() -> str:
 
 ### 5.4 No Hardcoded Model Configs
 
-The model's built-in chat template (from HuggingFace tokenizer config) handles prompt formatting. Any model works without adding code. An optional small registry of well-tested models with their reasoning prefixes may be provided as a convenience.
+The model's built-in chat template (from HuggingFace tokenizer config) handles prompt formatting. Many models can work without adding code, but verified support should be documented separately for explicitly tested model/backend combinations. An optional small registry of well-tested models with their reasoning prefixes may be provided as a convenience.
 
 ---
 
@@ -821,9 +821,9 @@ Subclass `JobScheduler`, implement the four abstract methods, pass instance via 
 | `predicted_{label}` | bool | P(true) > 0.5 |
 | `thinking_text_{label}` | str | Per-label reasoning (COT only) |
 
-### 10.2 Checkpointing
+### 10.2 Checkpointing (Deferred Design)
 
-When `save_dir` is provided:
+Intended behavior when `save_dir` is implemented:
 - Results saved incrementally to `{save_dir}/results.parquet`
 - Processed rows identified by hash, skipped on resume
 - Metadata file tracks progress, model info, config
@@ -975,7 +975,7 @@ uv
 
 ## 14. Implementation Status
 
-**Last Updated**: March 20, 2026
+**Last Updated**: March 26, 2026
 
 ### Completed (Phases 1–3)
 
@@ -983,7 +983,7 @@ All code migrated from the sentiment analysis project, refactored, and working:
 
 | File | Status | Notes |
 |------|--------|-------|
-| `src/prism/__init__.py` | ✓ | Public API: classify, rate, binary_classify, load_model, set_log_level |
+| `src/prism/__init__.py` | ✓ | Public API: classify, rate, binary_classify, load_model, set_log_level (beta rename to `label` planned) |
 | `src/prism/api.py` | ✓ | All three API functions, Polars + Pandas support, COT thinking_text |
 | `src/prism/model.py` | ✓ | Flattened Model class, load_model with auto-detection |
 | `src/prism/backends/base.py` | ✓ | InferenceBackend ABC |

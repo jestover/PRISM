@@ -12,6 +12,8 @@ PRISM is a Python package for extracting full probability distributions from loc
 
 The current near-term focus is correctness at the prompt/token boundary: in-context label tokenization, prompt-boundary absorption, prefix-overlap label handling, and parity between cached and uncached extraction. Distributed computing (SLURM, Grid Engine) and checkpointing remain future work.
 
+The intended beta task surface is `classify`, `rate`, and `label`. Current code still exposes `binary_classify()` while that rename is pending.
+
 ## Documentation
 
 - [`docs/overview.md`](docs/overview.md) for the project overview
@@ -77,7 +79,7 @@ model = prism.load_model(
 )
 ```
 
-Any HuggingFace-compatible model works — no hardcoded model configs. PRISM auto-detects reasoning models (QwQ, DeepSeek-R1, Qwen3, gpt-oss, etc.) from their chat template and configures the think-end sequence automatically. You can override with `think_end="</think>"` if needed.
+PRISM is designed to work with HuggingFace-compatible chat-template/tokenizer setups without hardcoded model configs, but verified support is still being narrowed to a small tested model matrix for beta. PRISM auto-detects reasoning models (QwQ, DeepSeek-R1, Qwen3, gpt-oss, etc.) from their chat template and configures the think-end sequence automatically. You can override with `think_end="</think>"` if needed.
 
 ### Classify
 
@@ -119,6 +121,8 @@ result = prism.rate(
 Returns columns: `prob_0` through `prob_100`, `expected_value`, `std_dev`, `mode`, `entropy`.
 
 ### Binary Classify
+
+Current implementation; planned beta rename: `label`.
 
 Independent true/false evaluation for multiple labels:
 
