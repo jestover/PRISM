@@ -13,13 +13,17 @@ Quick start::
 
 from prism.api import classify, label, rate
 from prism.model import Model, load_model
+from prism.tasks import Classify, Label, Rate
 from prism.utils import set_log_level
 
 __all__ = [
+    "Classify",
     "classify",
+    "Label",
     "label",
     "load_model",
     "Model",
+    "Rate",
     "rate",
     "set_log_level",
 ]

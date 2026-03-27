@@ -28,6 +28,7 @@ torch = [
     "accelerate",
 ]
 dev = [
+    "hypothesis",
     "pytest",
     "ruff",
 ]
