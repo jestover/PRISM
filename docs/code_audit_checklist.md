@@ -38,6 +38,10 @@ These are intentionally not part of the beta roadmap. They are ideas worth revis
 - [x] Review [`src/prism/tasks/shared.py`](/Users/jes0129/code/prism/src/prism/tasks/shared.py)
 - [x] Confirm DataFrame handling, context normalization, prompt-boundary helpers, and probability-computer construction
 - [x] Decide whether any helper should move or be simplified before deeper task audits
+- [ ] Add direct tests for `normalize_named_spec()` covering list/dict/string normalization and validation failures
+- [ ] Add direct tests for `resolve_contexts()`, `is_context_constant()`, and `get_constant_context()`
+- [ ] Add direct tests for `effective_prompt_tokens()` edge cases
+- [ ] Complete the shared-helper follow-up tests before starting the `rate.py` audit
 
 ### 3. Classify Task
 
@@ -137,4 +141,4 @@ These are intentionally not part of the beta roadmap. They are ideas worth revis
 - 2026-03-27: Added [`tests/blessed_models.toml`](/Users/jes0129/code/prism/tests/blessed_models.toml) as the blessed-model registry for opt-in verification tests.
 - 2026-03-27: Added [`tests/test_tokenization_boundaries_mlx.py`](/Users/jes0129/code/prism/tests/test_tokenization_boundaries_mlx.py) to verify reasoning-boundary tokenization against the blessed MLX tokenizer with no model forward pass.
 - 2026-03-27: The `SwigPyPacked` / `SwigPyObject` / `swigvarlink` deprecation warnings come from the `sentencepiece` dependency on Python 3.12, not from PRISM. They are now suppressed narrowly in the tokenizer-boundary test module.
-- Next resume point: audit [`src/prism/tasks/rate.py`](/Users/jes0129/code/prism/src/prism/tasks/rate.py) line by line, especially `_run_attribute()` and the multi-attribute output naming contract.
+- Next resume point: finish the remaining [`src/prism/tasks/shared.py`](/Users/jes0129/code/prism/src/prism/tasks/shared.py) helper tests listed above, then audit [`src/prism/tasks/rate.py`](/Users/jes0129/code/prism/src/prism/tasks/rate.py) line by line, especially `_run_attribute()` and the multi-attribute output naming contract.
