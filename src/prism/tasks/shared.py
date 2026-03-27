@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from typing import Dict, List, Optional, Tuple, Union
 
 from prism.core.label_probs import LabelProbabilityComputer
@@ -121,3 +122,45 @@ def get_constant_context(contexts: List[Optional[str]]) -> Optional[str]:
     if not contexts:
         return None
     return contexts[0]
+
+
+def normalize_named_spec(
+    spec: Union[str, Sequence[str], Mapping[str, Optional[str]]],
+    *,
+    argument_name: str,
+    allow_single_string: bool,
+) -> Tuple[List[str], Optional[Dict[str, Optional[str]]]]:
+    """Normalize a public list-or-dict task spec into names plus descriptions."""
+    if isinstance(spec, str):
+        if not allow_single_string:
+            raise TypeError(
+                f"{argument_name} must be a sequence of strings or a mapping of names to descriptions"
+            )
+        names = [spec]
+        descriptions = None
+    elif isinstance(spec, Mapping):
+        names = list(spec.keys())
+        descriptions = dict(spec)
+    elif isinstance(spec, Sequence):
+        names = list(spec)
+        descriptions = None
+    else:
+        raise TypeError(
+            f"{argument_name} must be a string, a sequence of strings, or a mapping of names to descriptions"
+        )
+
+    if not names:
+        raise ValueError(f"{argument_name} must not be empty")
+    if any(not isinstance(name, str) for name in names):
+        raise TypeError(f"{argument_name} entries must all be strings")
+    if len(set(names)) != len(names):
+        raise ValueError(f"{argument_name} entries must be unique")
+
+    if descriptions is not None:
+        for name, description in descriptions.items():
+            if not isinstance(name, str):
+                raise TypeError(f"{argument_name} keys must all be strings")
+            if description is not None and not isinstance(description, str):
+                raise TypeError(f"{argument_name} descriptions must be strings or None")
+
+    return names, descriptions

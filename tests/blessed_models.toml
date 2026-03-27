@@ -1,0 +1,7 @@
+[[models]]
+id = "gpt_oss_20b_mxfp4_q8"
+backend = "mlx"
+reasoning = true
+family = "gpt-oss"
+model_path = "mlx-community/gpt-oss-20b-MXFP4-Q8"
+expected_think_end = "<|channel|>final<|message|>"

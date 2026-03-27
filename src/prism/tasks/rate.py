@@ -17,6 +17,7 @@ from prism.tasks.shared import (
     get_column,
     get_constant_context,
     is_context_constant,
+    normalize_named_spec,
     resolve_contexts,
 )
 from prism.utils import get_logger
@@ -31,10 +32,9 @@ class Rate:
         self,
         df,
         column_name: str,
-        attribute: str,
+        attributes: Union[str, List[str], Dict[str, Optional[str]]],
         model: Model,
         *,
-        attribute_description: Optional[str] = None,
         scale_min: int = 0,
         scale_max: int = 100,
         use_reasoning: bool = False,
@@ -46,9 +46,12 @@ class Rate:
     ):
         self.df = df
         self.column_name = column_name
-        self.attribute = attribute
+        self.attributes, self.attribute_descriptions = normalize_named_spec(
+            attributes,
+            argument_name="attributes",
+            allow_single_string=True,
+        )
         self.model = model
-        self.attribute_description = attribute_description
         self.scale_min = scale_min
         self.scale_max = scale_max
         self.use_reasoning = use_reasoning
@@ -70,16 +73,43 @@ class Rate:
         texts = get_column(self.df, self.column_name)
         contexts = resolve_contexts(self.context, len(texts))
         logger.info(
-            "rate: %s texts, attribute=%r, scale=%s-%s",
+            "rate: %s texts, %s attributes, scale=%s-%s",
             len(texts),
-            self.attribute,
+            len(self.attributes),
             self.scale_min,
             self.scale_max,
         )
 
+        columns: Dict[str, list] = {}
+        for attribute in self.attributes:
+            attribute_description = None
+            if self.attribute_descriptions is not None:
+                attribute_description = self.attribute_descriptions.get(attribute)
+
+            attribute_columns = self._run_attribute(
+                texts,
+                contexts,
+                attribute,
+                attribute_description,
+            )
+
+            if len(self.attributes) == 1:
+                columns.update(attribute_columns)
+            else:
+                columns.update(self._prefix_attribute_columns(attribute, attribute_columns))
+
+        return add_columns(self.df, columns)
+
+    def _run_attribute(
+        self,
+        texts: List[str],
+        contexts: List[Optional[str]],
+        attribute: str,
+        attribute_description: Optional[str],
+    ) -> Dict[str, list]:
         system_msg = PromptBuilder.render_rate_system(
-            attribute=self.attribute,
-            attribute_description=self.attribute_description,
+            attribute=attribute,
+            attribute_description=attribute_description,
             scale_min=self.scale_min,
             scale_max=self.scale_max,
             additional_instructions=self.additional_instructions,
@@ -97,7 +127,17 @@ class Rate:
         all_thinking: List[Optional[str]] = [None] * len(texts)
 
         if self.reasoning_active:
-            self._run_reasoning(texts, contexts, system_msg, computer, n_absorbed, all_probs, all_thinking)
+            self._run_reasoning(
+                texts,
+                contexts,
+                attribute,
+                attribute_description,
+                system_msg,
+                computer,
+                n_absorbed,
+                all_probs,
+                all_thinking,
+            )
         else:
             self._run_direct(texts, contexts, system_msg, computer, n_absorbed, all_probs)
 
@@ -125,12 +165,14 @@ class Rate:
         if self.reasoning_active:
             columns["thinking_text"] = all_thinking
 
-        return add_columns(self.df, columns)
+        return columns
 
     def _run_reasoning(
         self,
         texts: List[str],
         contexts: List[Optional[str]],
+        attribute: str,
+        attribute_description: Optional[str],
         system_msg: str,
         computer,
         n_absorbed: int,
@@ -140,8 +182,8 @@ class Rate:
         for index, text in enumerate(texts):
             _, user_msg = self.builder.render_rate(
                 text=text,
-                attribute=self.attribute,
-                attribute_description=self.attribute_description,
+                attribute=attribute,
+                attribute_description=attribute_description,
                 scale_min=self.scale_min,
                 scale_max=self.scale_max,
                 context=contexts[index],
@@ -195,3 +237,14 @@ class Rate:
 
             if (index + 1) % 100 == 0 or index == len(texts) - 1:
                 logger.info("rate: processed %s/%s", index + 1, len(texts))
+
+    @staticmethod
+    def _prefix_attribute_columns(attribute: str, columns: Dict[str, list]) -> Dict[str, list]:
+        """Prefix per-attribute outputs when multiple attributes are rated."""
+        prefixed: Dict[str, list] = {}
+        for name, values in columns.items():
+            if name.startswith("prob_"):
+                prefixed[f"prob_{attribute}_{name.removeprefix('prob_')}"] = values
+            else:
+                prefixed[f"{name}_{attribute}"] = values
+        return prefixed

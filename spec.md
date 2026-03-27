@@ -97,7 +97,7 @@ The current implemented public API is `classify()`, `rate()`, and `label()`.
 | Function | Task shape | Core input | Probability outputs | Summary outputs |
 |----------|------------|------------|---------------------|-----------------|
 | `classify()` | Mutually exclusive labels | `labels=[...]` | `prob_{label}` | `predicted_class`, `max_prob`, `entropy`, `thinking_text` |
-| `rate()` | Integer scale distribution | `attribute=...`, `scale_min`, `scale_max` | `prob_{i}` | `expected_value`, `std_dev`, `mode`, `entropy`, `thinking_text` |
+| `rate()` | Integer scale distribution | `attributes=...`, `scale_min`, `scale_max` | `prob_{i}` or `prob_{attribute}_{i}` | `expected_value`, `std_dev`, `mode`, `entropy`, `thinking_text` |
 | `label()` | Independent true/false applicability | `labels={label: description}` | `prob_true_{label}` | `predicted_{label}`, `thinking_text_{label}` |
 
 Notes:
@@ -125,8 +125,7 @@ Returns a `Model` object bundling the inference backend, tokenizer (with chat te
 result = prism.classify(
     df,                                     # Polars or Pandas DataFrame
     column_name="text",                     # column containing text to classify
-    labels=["negative", "neutral", "positive"],
-    label_descriptions=None,                # optional {label: description}
+    labels=["negative", "neutral", "positive"],  # or {label: description}
     model=model,
     use_reasoning=False,                    # chain-of-thought before answering
     max_thinking_tokens=2048,
@@ -151,8 +150,7 @@ result = prism.classify(
 result = prism.rate(
     df,
     column_name="text",
-    attribute="populism",
-    attribute_description=None,
+    attributes="populism",                  # or [...], or {attribute: description}
     scale_min=0,
     scale_max=100,
     model=model,
@@ -179,10 +177,7 @@ result = prism.rate(
 result = prism.label(
     df,
     column_name="text",
-    labels={
-        "toxic": "Contains toxic language directed at other users",
-        "sarcastic": "Uses sarcasm or irony",
-    },
+    labels="toxic",                         # or [...], or {label: description}
     model=model,
     use_reasoning=False,
     max_thinking_tokens=2048,
@@ -200,23 +195,7 @@ result = prism.label(
 
 Each label is evaluated independently — multiple labels can be true simultaneously.
 
-### 3.5 Multi-Attribute Rating
-
-Status: deferred and not implemented in the current branch.
-
-```python
-results = prism.rate_multiple(
-    df,
-    column_name="text",
-    attributes={
-        "populism": "How populist is the rhetoric?",
-        "optimism": "How optimistic about the future?",
-    },
-    model=model,
-)
-```
-
-Each attribute rated independently with its own prompt and distribution.
+When multiple attributes are passed to `rate()`, each attribute is currently rated independently with its own prompt and distribution. Single-attribute runs keep the historical unprefixed columns; multi-attribute runs prefix output columns by attribute name.
 
 ---
 

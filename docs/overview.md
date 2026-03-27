@@ -39,9 +39,9 @@ Use PRISM when you need label probabilities, uncertainty metrics, or local/open-
 
 | Function | Task shape | Core input | Core outputs | Summary columns |
 |----------|------------|------------|--------------|-----------------|
-| `classify` | Mutually exclusive labels | `labels=[...]` | `prob_{label}` | `predicted_class`, `max_prob`, `entropy` |
-| `rate` | Integer scale distribution | `attribute=...`, `scale_min`, `scale_max` | `prob_{i}` | `expected_value`, `std_dev`, `mode`, `entropy` |
-| `label` | Independent true/false applicability | `labels={label: description}` | `prob_true_{label}` | `predicted_{label}` |
+| `classify` | Mutually exclusive labels | `labels=[...]` or `labels={label: description}` | `prob_{label}` | `predicted_class`, `max_prob`, `entropy` |
+| `rate` | Integer scale distribution | `attributes="..."`, `attributes=[...]`, or `attributes={attribute: description}` plus `scale_min`, `scale_max` | `prob_{i}` or `prob_{attribute}_{i}` | `expected_value`, `std_dev`, `mode`, `entropy` |
+| `label` | Independent true/false applicability | `labels="..."`, `labels=[...]`, or `labels={label: description}` | `prob_true_{label}` | `predicted_{label}` |
 
 When `use_reasoning=True`, `classify` and `rate` add `thinking_text`, and `label` adds `thinking_text_{label}`.
 

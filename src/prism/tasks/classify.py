@@ -16,6 +16,7 @@ from prism.tasks.shared import (
     get_column,
     get_constant_context,
     is_context_constant,
+    normalize_named_spec,
     resolve_contexts,
 )
 from prism.utils import get_logger
@@ -30,10 +31,9 @@ class Classify:
         self,
         df,
         column_name: str,
-        labels: List[str],
+        labels: Union[List[str], Dict[str, Optional[str]]],
         model: Model,
         *,
-        label_descriptions: Optional[Dict[str, str]] = None,
         use_reasoning: bool = False,
         max_thinking_tokens: int = 2048,
         additional_instructions: Optional[str] = None,
@@ -44,9 +44,12 @@ class Classify:
     ):
         self.df = df
         self.column_name = column_name
-        self.labels = labels
+        self.labels, self.label_descriptions = normalize_named_spec(
+            labels,
+            argument_name="labels",
+            allow_single_string=False,
+        )
         self.model = model
-        self.label_descriptions = label_descriptions
         self.use_reasoning = use_reasoning
         self.max_thinking_tokens = max_thinking_tokens
         self.additional_instructions = additional_instructions

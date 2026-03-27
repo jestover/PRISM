@@ -117,7 +117,7 @@ class TestRate:
         result = prism.rate(
             sample_df,
             column_name="text",
-            attribute="sentiment",
+            attributes="sentiment",
             model=model,
             scale_min=0,
             scale_max=10,  # small scale for speed

@@ -13,22 +13,31 @@ This checklist tracks the collaborative beta audit. The rule for every section i
 
 - [x] Thin public API wrappers now delegate to task classes.
 - [x] Legacy correctness/prompt suites renamed with `_old` suffixes.
+- [x] One opt-in MLX tokenizer-boundary regression test exists for the current blessed reasoning model.
 - [ ] Docs aligned to the new task-class structure.
-- [ ] New audit-era tests added.
+- [x] New audit-era tests added.
+
+## Future Ideas Parking Lot
+
+These are intentionally not part of the beta roadmap. They are ideas worth revisiting later and may never be implemented.
+
+- A helper such as `build_context_window(...)` for constructing rolling sentence/section context outside the core task API
+- An `execution_mode` argument for `rate()` and `label()` to support grouped prompt strategies beyond today's independent-per-item execution
+- If grouped execution is ever added, consider matching shuffle controls for grouped labels/attributes
 
 ## Audit Order
 
 ### 1. Public API Surface
 
-- [ ] Review [`src/prism/api.py`](/Users/jes0129/code/prism/src/prism/api.py)
-- [ ] Review [`src/prism/__init__.py`](/Users/jes0129/code/prism/src/prism/__init__.py)
-- [ ] Confirm the public contract we want to preserve during the audit
+- [x] Review [`src/prism/api.py`](/Users/jes0129/code/prism/src/prism/api.py)
+- [x] Review [`src/prism/__init__.py`](/Users/jes0129/code/prism/src/prism/__init__.py)
+- [x] Confirm the public contract we want to preserve during the audit
 
 ### 2. Shared Task Helpers
 
-- [ ] Review [`src/prism/tasks/shared.py`](/Users/jes0129/code/prism/src/prism/tasks/shared.py)
-- [ ] Confirm DataFrame handling, context normalization, prompt-boundary helpers, and probability-computer construction
-- [ ] Decide whether any helper should move or be simplified before deeper task audits
+- [x] Review [`src/prism/tasks/shared.py`](/Users/jes0129/code/prism/src/prism/tasks/shared.py)
+- [x] Confirm DataFrame handling, context normalization, prompt-boundary helpers, and probability-computer construction
+- [x] Decide whether any helper should move or be simplified before deeper task audits
 
 ### 3. Classify Task
 
@@ -119,3 +128,13 @@ This checklist tracks the collaborative beta audit. The rule for every section i
 - [ ] Update [`docs/overview.md`](/Users/jes0129/code/prism/docs/overview.md)
 - [ ] Update [`README.md`](/Users/jes0129/code/prism/README.md)
 - [ ] Update [`spec.md`](/Users/jes0129/code/prism/spec.md)
+
+## Session Notes
+
+- 2026-03-27: Public API and shared-task-helper audit sections are complete.
+- 2026-03-27: `classify(labels=...)` now accepts list or dict. `label(labels=...)` now accepts string, list, or dict. `rate(attributes=...)` now accepts string, list, or dict and currently handles multiple attributes by running independent single-attribute prompts.
+- 2026-03-27: Multi-attribute `rate()` keeps unprefixed columns for a single attribute and prefixes columns by attribute name only when multiple attributes are requested.
+- 2026-03-27: Added [`tests/blessed_models.toml`](/Users/jes0129/code/prism/tests/blessed_models.toml) as the blessed-model registry for opt-in verification tests.
+- 2026-03-27: Added [`tests/test_tokenization_boundaries_mlx.py`](/Users/jes0129/code/prism/tests/test_tokenization_boundaries_mlx.py) to verify reasoning-boundary tokenization against the blessed MLX tokenizer with no model forward pass.
+- 2026-03-27: The `SwigPyPacked` / `SwigPyObject` / `swigvarlink` deprecation warnings come from the `sentencepiece` dependency on Python 3.12, not from PRISM. They are now suppressed narrowly in the tokenizer-boundary test module.
+- Next resume point: audit [`src/prism/tasks/rate.py`](/Users/jes0129/code/prism/src/prism/tasks/rate.py) line by line, especially `_run_attribute()` and the multi-attribute output naming contract.

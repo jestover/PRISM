@@ -15,6 +15,7 @@ from prism.tasks.shared import (
     get_column,
     get_constant_context,
     is_context_constant,
+    normalize_named_spec,
     resolve_contexts,
 )
 from prism.utils import get_logger
@@ -29,7 +30,7 @@ class Label:
         self,
         df,
         column_name: str,
-        labels: Dict[str, Optional[str]],
+        labels: Union[str, List[str], Dict[str, Optional[str]]],
         model: Model,
         *,
         use_reasoning: bool = False,
@@ -41,7 +42,11 @@ class Label:
     ):
         self.df = df
         self.column_name = column_name
-        self.labels = labels
+        self.labels, self.label_descriptions = normalize_named_spec(
+            labels,
+            argument_name="labels",
+            allow_single_string=True,
+        )
         self.model = model
         self.use_reasoning = use_reasoning
         self.max_thinking_tokens = max_thinking_tokens
@@ -64,7 +69,10 @@ class Label:
         logger.info("label: %s texts, %s labels", len(texts), len(self.labels))
 
         columns: Dict[str, list] = {}
-        for label_name, label_description in self.labels.items():
+        for label_name in self.labels:
+            label_description = None
+            if self.label_descriptions is not None:
+                label_description = self.label_descriptions.get(label_name)
             probability_true: List[float] = []
             thinking_texts: List[Optional[str]] = []
             logger.info("label: starting label %r", label_name)

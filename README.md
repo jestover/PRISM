@@ -112,7 +112,7 @@ Probability distribution over an integer scale:
 result = prism.rate(
     df,
     column_name="text",
-    attribute="populism",
+    attributes="populism",
     model=model,
     scale_min=0,
     scale_max=100,
